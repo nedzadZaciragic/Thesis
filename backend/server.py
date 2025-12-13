@@ -241,6 +241,9 @@ class Apartment(BaseModel):
     wifi_network: str = ""
     wifi_password: str = ""
     wifi_instructions: str = ""
+    # Geocoding coordinates (from Mapbox)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     # Analytics data
     total_chats: int = 0
