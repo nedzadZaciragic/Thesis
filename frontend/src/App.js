@@ -2103,7 +2103,7 @@ const GuestChat = ({ apartmentId }) => {
         <div className="p-4">
           {/* Enhanced Suggestions - Better mobile display */}
           <div className="mb-3">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               {[
                 'How do I check in?', 
                 'What\'s the WiFi password?', 
@@ -2115,7 +2115,7 @@ const GuestChat = ({ apartmentId }) => {
                 <button
                   key={suggestion}
                   onClick={() => setInputMessage(suggestion)}
-                  className="text-xs px-3 py-2 bg-blue-50 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors text-blue-700 font-medium"
+                  className="text-xs sm:text-sm px-3 py-2 bg-blue-50 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors text-blue-700 font-medium whitespace-nowrap"
                 >
                   {suggestion}
                 </button>
