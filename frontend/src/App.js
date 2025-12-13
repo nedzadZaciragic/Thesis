@@ -5012,11 +5012,11 @@ const HostDashboard = () => {
                     <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
                       <div className="text-center">
                         <p className="text-lg font-bold text-blue-600">{apartment.total_chats || 0}</p>
-                        <p className="text-xs text-gray-600">AI Conversations</p>
+                        <p className="text-xs text-gray-600">Total Messages</p>
                       </div>
                       <div className="text-center">
                         <p className="text-lg font-bold text-emerald-600">{apartment.total_sessions || 0}</p>
-                        <p className="text-xs text-gray-600">Unique Guests</p>
+                        <p className="text-xs text-gray-600">Chat Sessions</p>
                       </div>
                     </div>
 
