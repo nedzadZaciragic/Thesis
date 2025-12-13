@@ -4915,32 +4915,35 @@ const HostDashboard = () => {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="apartments" className="flex items-center space-x-2">
-              <Building2 className="h-4 w-4" />
-              <span>Properties</span>
-            </TabsTrigger>
-            <TabsTrigger value="tutorial" className="flex items-center space-x-2">
-              <BookOpen className="h-4 w-4" />
-              <span>Setup Guide</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center space-x-2">
-              <BarChart3 className="h-4 w-4" />
-              <span>Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="billing" className="flex items-center space-x-2">
-              <CreditCard className="h-4 w-4" />
-              <span>Billing</span>
-            </TabsTrigger>
-            <TabsTrigger value="whitelabel" className="flex items-center space-x-2">
-              <Palette className="h-4 w-4" />
-              <span>Branding</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
-            </TabsTrigger>
-          </TabsList>
+          {/* Mobile-friendly tabs with horizontal scroll */}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:grid-cols-6">
+              <TabsTrigger value="apartments" className="flex items-center space-x-2 whitespace-nowrap">
+                <Building2 className="h-4 w-4" />
+                <span>Properties</span>
+              </TabsTrigger>
+              <TabsTrigger value="tutorial" className="flex items-center space-x-2 whitespace-nowrap">
+                <BookOpen className="h-4 w-4" />
+                <span>Setup Guide</span>
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center space-x-2 whitespace-nowrap">
+                <BarChart3 className="h-4 w-4" />
+                <span>Analytics</span>
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="flex items-center space-x-2 whitespace-nowrap">
+                <CreditCard className="h-4 w-4" />
+                <span>Billing</span>
+              </TabsTrigger>
+              <TabsTrigger value="whitelabel" className="flex items-center space-x-2 whitespace-nowrap">
+                <Palette className="h-4 w-4" />
+                <span>Branding</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center space-x-2 whitespace-nowrap">
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Enhanced Apartments Tab */}
           <TabsContent value="apartments">
