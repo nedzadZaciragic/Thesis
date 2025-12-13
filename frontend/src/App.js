@@ -4826,14 +4826,14 @@ const HostDashboard = () => {
                   <div className="bg-emerald-100 rounded-full w-8 h-8 flex items-center justify-center mr-3">
                     <span className="text-sm font-bold text-emerald-600">3</span>
                   </div>
-                  <h4 className="font-semibold text-gray-900">Setup iCal & Notifications</h4>
+                  <h4 className="font-semibold text-gray-900">Generate QR Code</h4>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
-                  Connect your booking calendars for automatic guest notifications via email & WhatsApp.
+                  Create QR codes and downloadable PDFs for your guests to easily access the AI assistant.
                 </p>
                 <div className="flex items-center text-xs text-emerald-600">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  iCal Integration
+                  <QrCode className="h-3 w-3 mr-1" />
+                  QR Code Generator
                 </div>
               </div>
 
@@ -4842,14 +4842,14 @@ const HostDashboard = () => {
                   <div className="bg-orange-100 rounded-full w-8 h-8 flex items-center justify-center mr-3">
                     <span className="text-sm font-bold text-orange-600">4</span>
                   </div>
-                  <h4 className="font-semibold text-gray-900">Deploy & Monitor</h4>
+                  <h4 className="font-semibold text-gray-900">Monitor & Optimize</h4>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
-                  Generate QR codes, share guest links, and track performance in analytics.
+                  Track guest interactions, popular questions, and assistant performance in real-time.
                 </p>
                 <div className="flex items-center text-xs text-orange-600">
                   <BarChart3 className="h-3 w-3 mr-1" />
-                  Analytics Tab
+                  Analytics Dashboard
                 </div>
               </div>
             </div>
