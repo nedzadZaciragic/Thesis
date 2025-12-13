@@ -4574,7 +4574,6 @@ const HostDashboard = () => {
       description: apartment.description,
       rules: apartment.rules || [],
       contact: apartment.contact || { phone: "", email: "", whatsapp: "" },
-      ai_tone: apartment.ai_tone || "professional",
       recommendations: apartment.recommendations || {
         restaurants: [],
         hidden_gems: [],
