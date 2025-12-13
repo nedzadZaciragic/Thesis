@@ -1220,15 +1220,18 @@ async def search_nearby_places_with_mapbox(
                         
                         # Only include places within radius
                         if distance <= radius_meters:
-                            # Try different name fields from Mapbox response
-                            name = (properties.get('name') or 
-                                   properties.get('full_address') or 
-                                   properties.get('address') or 
+                            # Extract name from Mapbox response
+                            name = (properties.get('feature_name') or 
+                                   properties.get('name') or 
+                                   properties.get('place_name', '').split(',')[0] or
                                    'Unknown Place')
+                            
+                            # Extract address
+                            address = properties.get('description') or properties.get('place_name', '')
                             
                             places.append({
                                 'name': name,
-                                'address': properties.get('full_address', ''),
+                                'address': address,
                                 'category': search_category,
                                 'distance': round(distance),
                                 'latitude': place_lat,
