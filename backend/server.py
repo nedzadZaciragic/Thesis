@@ -2480,6 +2480,14 @@ async def export_all_data(current_user: User = Depends(get_current_user)):
 async def create_apartment(apartment_data: ApartmentCreate, current_user: User = Depends(get_current_user)):
     """Create a new apartment with host data"""
     try:
+        # Geocode address with Mapbox if not provided
+        if apartment_data.address and (apartment_data.latitude is None or apartment_data.longitude is None):
+            coords = await geocode_address_with_mapbox(apartment_data.address)
+            if coords:
+                apartment_data.latitude = coords['latitude']
+                apartment_data.longitude = coords['longitude']
+                logger.info(f"Geocoded address: {apartment_data.address} -> {coords}")
+        
         apartment = Apartment(
             user_id=current_user.id,
             **apartment_data.dict()
