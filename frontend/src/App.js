@@ -5403,43 +5403,6 @@ const HostDashboard = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Default AI Tone
-                    </label>
-                    <Select 
-                      value={whitelabelData.ai_tone} 
-                      onValueChange={(value) => setWhitelabelData(prev => ({...prev, ai_tone: value}))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="professional">
-                          <div className="flex items-center">
-                            <Briefcase className="h-4 w-4 mr-2" />
-                            Professional - Formal and informative
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="friendly">
-                          <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
-                            Friendly - Warm and welcoming
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="casual">
-                          <div className="flex items-center">
-                            <Coffee className="h-4 w-4 mr-2" />
-                            Casual - Relaxed and conversational
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      This can be overridden per property in the property settings
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       AI Assistant Name
                     </label>
                     <Input
