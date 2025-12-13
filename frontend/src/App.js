@@ -4835,7 +4835,7 @@ const HostDashboard = () => {
                   <h4 className="font-semibold text-gray-900">Customize Brand</h4>
                 </div>
                 <p className="text-sm text-gray-600 mb-3">
-                  Set your colors, logo, AI tone, and chat appearance to match your brand.
+                  Set your colors, logo, and chat appearance to match your brand.
                 </p>
                 <div className="flex items-center text-xs text-purple-600">
                   <Palette className="h-3 w-3 mr-1" />
