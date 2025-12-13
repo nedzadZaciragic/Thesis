@@ -5824,51 +5824,6 @@ const HostDashboard = () => {
                     />
                   </div>
 
-                  {/* AI Configuration */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-                      <Bot className="h-5 w-5 mr-2" />
-                      AI Assistant Configuration
-                    </h3>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        AI Personality & Tone
-                      </label>
-                      <Select 
-                        value={formData.ai_tone} 
-                        onValueChange={(value) => setFormData(prev => ({...prev, ai_tone: value}))}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="professional">
-                            <div className="flex items-center">
-                              <Briefcase className="h-4 w-4 mr-2" />
-                              Professional - Formal, informative, business-like
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="friendly">
-                            <div className="flex items-center">
-                              <User className="h-4 w-4 mr-2" />
-                              Friendly - Warm, welcoming, personal
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="casual">
-                            <div className="flex items-center">
-                              <Coffee className="h-4 w-4 mr-2" />
-                              Casual - Relaxed, conversational, laid-back
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        This affects how your AI assistant communicates with guests
-                      </p>
-                    </div>
-                  </div>
-
                   {/* Contact & Notifications */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 flex items-center">
