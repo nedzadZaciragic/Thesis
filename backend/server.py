@@ -2731,23 +2731,62 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
                     await cache_places(apartment_id, detected_category, places)
                     logger.info(f"Cached {len(places)} places for {detected_category}")
             
+            # Detect guest's language
+            guest_language = 'en'  # default
+            if any(word in message_lower for word in ['gdje', 'gde', 'ima li', 'najbliz', 'mogu', 'kako']):
+                guest_language = 'bs'  # Bosnian/Croatian/Serbian
+            elif any(word in message_lower for word in ['wo ist', 'gibt es', 'wo gibt']):
+                guest_language = 'de'  # German
+            elif any(word in message_lower for word in ['où', 'y a-t-il', 'où se trouve']):
+                guest_language = 'fr'  # French
+            elif any(word in message_lower for word in ['dónde', 'hay algún', 'dónde está']):
+                guest_language = 'es'  # Spanish
+            
             # Generate natural response
             if places:
                 top_place = places[0]
-                proximity_response = f"The closest {detected_category} is **{top_place['name']}**, about {top_place['distance']} meters away"
                 
-                if top_place.get('address'):
-                    proximity_response += f" at {top_place['address']}"
+                # Extract clean address: street + city only (remove postal code and country)
+                full_address = top_place.get('address', '')
+                clean_address = full_address
                 
-                proximity_response += "."
+                # Remove postal codes (5-6 digit numbers)
+                import re
+                clean_address = re.sub(r'\b\d{4,6}\b', '', clean_address)
+                # Remove country names
+                country_names = ['Bosnia and Herzegovina', 'Croatia', 'Serbia', 'Germany', 'France', 'Italy', 'Spain']
+                for country in country_names:
+                    clean_address = clean_address.replace(country, '')
+                # Clean up extra commas and spaces
+                clean_address = re.sub(r',\s*,', ',', clean_address).strip(', ')
                 
-                # Add 2-3 more options
-                if len(places) > 1:
-                    proximity_response += "\n\nOther nearby options:\n"
-                    for place in places[1:4]:  # Show up to 3 more
-                        proximity_response += f"• {place['name']} ({place['distance']}m away)\n"
+                # Language-specific responses
+                if guest_language == 'bs':
+                    proximity_response = f"Najbliži {detected_category} je **{top_place['name']}**, udaljen oko {top_place['distance']} metara"
+                    if clean_address:
+                        proximity_response += f" na adresi {clean_address}"
+                    proximity_response += "."
+                    
+                    if len(places) > 1:
+                        proximity_response += "\n\nOstale opcije u blizini:\n"
+                        for place in places[1:4]:
+                            proximity_response += f"• {place['name']} ({place['distance']}m)\n"
+                else:  # English default
+                    proximity_response = f"The closest {detected_category} is **{top_place['name']}**, about {top_place['distance']} meters away"
+                    if clean_address:
+                        proximity_response += f" at {clean_address}"
+                    proximity_response += "."
+                    
+                    if len(places) > 1:
+                        proximity_response += "\n\nOther nearby options:\n"
+                        for place in places[1:4]:
+                            proximity_response += f"• {place['name']} ({place['distance']}m away)\n"
             else:
-                proximity_response = f"I couldn't find any {detected_category}s in the immediate area. You might want to ask your host for specific recommendations."
+                # No results found - language-specific fallback
+                if guest_language == 'bs':
+                    proximity_response = f"Nisam mogao pronaći {detected_category} u neposrednoj blizini. Možete pitati svog domaćina za specifične preporuke."
+                else:
+                    proximity_response = f"I couldn't find any {detected_category}s in the immediate area. You might want to ask your host for specific recommendations."
         
         # Create personalized system prompt for guest
         system_prompt = create_ai_system_prompt(apartment, branding)
