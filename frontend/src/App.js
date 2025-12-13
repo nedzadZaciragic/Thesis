@@ -432,7 +432,7 @@ const ResetPasswordPage = () => {
   );
 };
 
-// Address Autocomplete Component using OpenStreetMap
+// Address Autocomplete Component using Mapbox
 const AddressAutocomplete = ({ value, onChange, onCoordinatesChange, placeholder = "Enter address..." }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -448,116 +448,33 @@ const AddressAutocomplete = ({ value, onChange, onCoordinatesChange, placeholder
 
     setLoading(true);
     try {
-      // Try multiple approaches for better accuracy
-      const suggestions = [];
+      // Mapbox Geocoding API
+      const MAPBOX_TOKEN = 'pk.eyJ1IjoiMjAwM3N0dXJtIiwiYSI6ImNtajRtZDZxazBlM2EzZXNidWZzbXBhcnkifQ.GoV4jTj9E50Qzjn0Ywe_AQ';
+      const encodedQuery = encodeURIComponent(query);
+      const mapboxUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_TOKEN}&limit=5&types=address,place`;
       
-      // Approach 1: Direct address search with better parameters
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?` +
-        `format=json` +
-        `&addressdetails=1` +
-        `&limit=5` +
-        `&countrycodes=&` + // Allow all countries
-        `&q=${encodeURIComponent(query)}` +
-        `&bounded=0` +
-        `&polygon_geojson=0`;
+      const response = await fetch(mapboxUrl);
+      const data = await response.json();
       
-      const response1 = await fetch(nominatimUrl);
-      const data1 = await response1.json();
-      
-      // Add results from first search
-      data1.forEach(item => {
-        suggestions.push({
-          display_name: item.display_name,
-          lat: item.lat,
-          lon: item.lon,
-          source: 'nominatim'
-        });
-      });
-      
-      // Approach 2: If few results, try structured search
-      if (suggestions.length < 3) {
-        // Try to parse address parts
-        const parts = query.split(',').map(p => p.trim());
-        if (parts.length >= 2) {
-          const structuredUrl = `https://nominatim.openstreetmap.org/search?` +
-            `format=json` +
-            `&addressdetails=1` +
-            `&limit=3` +
-            `&street=${encodeURIComponent(parts[0])}` +
-            `&city=${encodeURIComponent(parts[parts.length - 1])}`;
-          
-          try {
-            const response2 = await fetch(structuredUrl);
-            const data2 = await response2.json();
-            
-            data2.forEach(item => {
-              // Avoid duplicates
-              const exists = suggestions.some(s => s.display_name === item.display_name);
-              if (!exists) {
-                suggestions.push({
-                  display_name: item.display_name,
-                  lat: item.lat,
-                  lon: item.lon,
-                  source: 'nominatim-structured'
-                });
-              }
-            });
-          } catch (e) {
-            console.log('Structured search failed:', e);
-          }
-        }
+      if (data.features && data.features.length > 0) {
+        const mappedSuggestions = data.features.map(feature => ({
+          display_name: feature.place_name,
+          lat: feature.center[1],  // Mapbox returns [lon, lat]
+          lon: feature.center[0]
+        }));
+        
+        setSuggestions(mappedSuggestions);
+        setShowSuggestions(true);
+      } else {
+        // Fallback: Allow manual entry if no results
+        setSuggestions([{
+          display_name: `"${query}" (manual entry)`,
+          lat: null,
+          lon: null,
+          manual: true
+        }]);
+        setShowSuggestions(true);
       }
-      
-      // Approach 3: Try with different query format for street numbers
-      if (suggestions.length < 3) {
-        // Rearrange query - try "street number, city" format
-        const numberMatch = query.match(/(\d+)/);
-        const streetMatch = query.replace(/\d+/g, '').trim();
-        
-        if (numberMatch && streetMatch) {
-          const reformattedQuery = `${streetMatch} ${numberMatch[0]}`;
-          const response3 = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=3&q=${encodeURIComponent(reformattedQuery)}`
-          );
-          const data3 = await response3.json();
-          
-          data3.forEach(item => {
-            const exists = suggestions.some(s => s.display_name === item.display_name);
-            if (!exists) {
-              suggestions.push({
-                display_name: item.display_name,
-                lat: item.lat,
-                lon: item.lon,
-                source: 'nominatim-reformatted'
-              });
-            }
-          });
-        }
-      }
-      
-      // Sort suggestions by relevance (exact matches first)
-      const sortedSuggestions = suggestions.sort((a, b) => {
-        const aLower = a.display_name.toLowerCase();
-        const bLower = b.display_name.toLowerCase();
-        const queryLower = query.toLowerCase();
-        
-        // Exact matches first
-        if (aLower.includes(queryLower) && !bLower.includes(queryLower)) return -1;
-        if (!aLower.includes(queryLower) && bLower.includes(queryLower)) return 1;
-        
-        // Shorter names first (more specific)
-        return a.display_name.length - b.display_name.length;
-      });
-      
-      // Limit to 5 best results
-      const finalSuggestions = sortedSuggestions.slice(0, 5).map(item => ({
-        display_name: item.display_name,
-        lat: item.lat,
-        lon: item.lon
-      }));
-      
-      setSuggestions(finalSuggestions);
-      setShowSuggestions(true);
       
     } catch (error) {
       console.error('Address autocomplete error:', error);
