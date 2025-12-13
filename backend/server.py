@@ -290,6 +290,9 @@ class ApartmentUpdate(BaseModel):
     wifi_network: str = ""
     wifi_password: str = ""
     wifi_instructions: str = ""
+    # Geocoding coordinates (from Mapbox)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class BookingNotification(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
