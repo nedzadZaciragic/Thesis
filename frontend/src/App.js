@@ -5453,7 +5453,7 @@ const HostDashboard = () => {
                   <div className="space-y-3" style={{ fontFamily: whitelabelData.chat_font }}>
                     <div className="flex justify-start">
                       <div className="bg-white p-3 rounded-lg rounded-bl-sm max-w-xs">
-                        <p className="text-sm">Welcome! I'm your {whitelabelData.ai_tone} AI assistant. How can I help you today?</p>
+                        <p className="text-sm">Welcome! I'm your AI assistant. How can I help you today?</p>
                       </div>
                     </div>
                     <div className="flex justify-end">
