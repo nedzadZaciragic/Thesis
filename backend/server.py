@@ -2643,25 +2643,39 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
         
         # Define proximity keywords and categories
         proximity_keywords = {
-            'supermarket': ['supermarket', 'grocery', 'store'],
-            'bakery': ['bakery', 'bread', 'pastry'],
-            'pharmacy': ['pharmacy', 'medicine', 'drug store', 'apoteka'],
-            'restaurant': ['restaurant', 'food', 'eat', 'dining'],
-            'cafe': ['cafe', 'coffee', 'cafeteria'],
+            'supermarket': ['supermarket', 'grocery', 'store', 'market', 'prodavnica', 'trgovina'],
+            'bakery': ['bakery', 'bread', 'pastry', 'pekara', 'pekarna'],
+            'pharmacy': ['pharmacy', 'medicine', 'drug store', 'apoteka', 'ljekarna'],
+            'restaurant': ['restaurant', 'restoran'],
+            'cafe': ['cafe', 'coffee', 'cafeteria', 'kafic', 'kava'],
             'bar': ['bar', 'pub', 'drink'],
-            'club': ['club', 'nightclub', 'night life', 'nightlife'],
-            'atm': ['atm', 'cash', 'money'],
+            'club': ['club', 'nightclub', 'night life', 'nightlife', 'klub'],
+            'atm': ['atm', 'cash', 'money', 'bankomat'],
             'bank': ['bank', 'banka'],
             'hospital': ['hospital', 'emergency', 'bolnica'],
-            'shopping': ['shopping', 'mall', 'shopping center'],
+            'shopping': ['shopping', 'mall', 'shopping center', 'trgovacki centar'],
             'park': ['park'],
-            'gym': ['gym', 'fitness'],
+            'gym': ['gym', 'fitness', 'teretana'],
             'museum': ['museum', 'muzej'],
             'attraction': ['tourist', 'attraction', 'sightseeing']
         }
         
-        # Proximity query indicators
-        proximity_indicators = ['nearest', 'closest', 'nearby', 'near', 'close', 'around', 'najbliz']
+        # Extended proximity query indicators - multiple languages
+        proximity_indicators = [
+            # English
+            'nearest', 'closest', 'nearby', 'near', 'close', 'around',
+            'where is', 'where can i find', 'is there', 'are there',
+            # Bosnian/Croatian/Serbian
+            'najbliz', 'gdje je', 'gde je', 'gdje mogu', 'ima li', 'postoji li',
+            # German
+            'wo ist', 'wo gibt es', 'gibt es',
+            # French
+            'où est', 'où se trouve', 'y a-t-il',
+            # Spanish
+            'dónde está', 'dónde hay', 'hay algún',
+            # Italian
+            'dove si trova', 'dove posso trovare', 'c\'è un'
+        ]
         
         # Check if message contains proximity indicators
         has_proximity_indicator = any(indicator in message_lower for indicator in proximity_indicators)
@@ -2673,8 +2687,28 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
                 detected_category = category
                 break
         
+        # Check if host has recommendations for this category
+        host_has_recommendations = False
+        if detected_category and apartment.get('recommendations'):
+            recommendations = apartment['recommendations']
+            # Check if host provided recommendations for restaurants/bars/cafes
+            if detected_category in ['restaurant', 'cafe', 'bar']:
+                if recommendations.get('restaurants') or recommendations.get('nightlife'):
+                    host_has_recommendations = True
+        
+        # Determine if we should use proximity search
+        use_proximity_search = False
+        explicit_proximity_request = any(word in message_lower for word in ['nearest', 'closest', 'najbliz'])
+        
+        if detected_category and apartment.get('latitude') and apartment.get('longitude'):
+            # Use proximity search if:
+            # 1. Guest explicitly asks for "nearest/closest", OR
+            # 2. Guest asks "where is X" and host doesn't have recommendations for X
+            if explicit_proximity_request or (has_proximity_indicator and not host_has_recommendations):
+                use_proximity_search = True
+        
         # If this is a proximity query and apartment has coordinates
-        if has_proximity_indicator and detected_category and apartment.get('latitude') and apartment.get('longitude'):
+        if use_proximity_search:
             logger.info(f"Proximity query detected: category={detected_category}, apartment_id={apartment_id}")
             
             # Check cache first
