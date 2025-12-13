@@ -2627,11 +2627,93 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
             "ai_assistant_name": user.get('ai_assistant_name', 'AI Assistant'),
         }
         
+        # PROXIMITY SEARCH LOGIC - Check if this is a "nearest places" query
+        proximity_response = None
+        message_lower = chat_request.message.lower()
+        
+        # Define proximity keywords and categories
+        proximity_keywords = {
+            'supermarket': ['supermarket', 'grocery', 'store'],
+            'bakery': ['bakery', 'bread', 'pastry'],
+            'pharmacy': ['pharmacy', 'medicine', 'drug store', 'apoteka'],
+            'restaurant': ['restaurant', 'food', 'eat', 'dining'],
+            'cafe': ['cafe', 'coffee', 'cafeteria'],
+            'bar': ['bar', 'pub', 'drink'],
+            'club': ['club', 'nightclub', 'night life', 'nightlife'],
+            'atm': ['atm', 'cash', 'money'],
+            'bank': ['bank', 'banka'],
+            'hospital': ['hospital', 'emergency', 'bolnica'],
+            'shopping': ['shopping', 'mall', 'shopping center'],
+            'park': ['park'],
+            'gym': ['gym', 'fitness'],
+            'museum': ['museum', 'muzej'],
+            'attraction': ['tourist', 'attraction', 'sightseeing']
+        }
+        
+        # Proximity query indicators
+        proximity_indicators = ['nearest', 'closest', 'nearby', 'near', 'close', 'around', 'najbliz']
+        
+        # Check if message contains proximity indicators
+        has_proximity_indicator = any(indicator in message_lower for indicator in proximity_indicators)
+        
+        # Detect category
+        detected_category = None
+        for category, keywords in proximity_keywords.items():
+            if any(keyword in message_lower for keyword in keywords):
+                detected_category = category
+                break
+        
+        # If this is a proximity query and apartment has coordinates
+        if has_proximity_indicator and detected_category and apartment.get('latitude') and apartment.get('longitude'):
+            logger.info(f"Proximity query detected: category={detected_category}, apartment_id={apartment_id}")
+            
+            # Check cache first
+            cached_places = await get_cached_places(apartment_id, detected_category)
+            
+            if cached_places:
+                logger.info(f"Using cached results for {detected_category}")
+                places = cached_places
+            else:
+                # Search with Mapbox
+                places = await search_nearby_places_with_mapbox(
+                    apartment['latitude'],
+                    apartment['longitude'],
+                    detected_category,
+                    radius_meters=1500  # 1.5km walking distance
+                )
+                
+                # Cache the results
+                if places:
+                    await cache_places(apartment_id, detected_category, places)
+                    logger.info(f"Cached {len(places)} places for {detected_category}")
+            
+            # Generate natural response
+            if places:
+                top_place = places[0]
+                proximity_response = f"The closest {detected_category} is **{top_place['name']}**, about {top_place['distance']} meters away"
+                
+                if top_place.get('address'):
+                    proximity_response += f" at {top_place['address']}"
+                
+                proximity_response += "."
+                
+                # Add 2-3 more options
+                if len(places) > 1:
+                    proximity_response += "\n\nOther nearby options:\n"
+                    for place in places[1:4]:  # Show up to 3 more
+                        proximity_response += f"• {place['name']} ({place['distance']}m away)\n"
+            else:
+                proximity_response = f"I couldn't find any {detected_category}s in the immediate area. You might want to ask your host for specific recommendations."
+        
         # Create personalized system prompt for guest
         system_prompt = create_ai_system_prompt(apartment, branding)
         
-        # Initialize session_id for conversation history
-        session_id = chat_request.session_id or f"guest_{apartment_id}_{datetime.now().timestamp()}"
+        # If we have a proximity response, use it directly
+        if proximity_response:
+            response = proximity_response
+        else:
+            # Initialize session_id for conversation history
+            session_id = chat_request.session_id or f"guest_{apartment_id}_{datetime.now().timestamp()}"
         
         # Get conversation history for context (last 10 messages)
         recent_messages = await db.chat_messages.find(
