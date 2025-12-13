@@ -2519,6 +2519,15 @@ async def update_apartment(
         if not existing_apartment:
             raise HTTPException(status_code=404, detail="Apartment not found")
         
+        # Geocode address if changed and coordinates not provided
+        if (apartment_data.address != existing_apartment.get('address') and 
+            (apartment_data.latitude is None or apartment_data.longitude is None)):
+            coords = await geocode_address_with_mapbox(apartment_data.address)
+            if coords:
+                apartment_data.latitude = coords['latitude']
+                apartment_data.longitude = coords['longitude']
+                logger.info(f"Re-geocoded address: {apartment_data.address} -> {coords}")
+        
         # Update apartment
         update_data = prepare_for_mongo(apartment_data.dict())
         await db.apartments.update_one(
