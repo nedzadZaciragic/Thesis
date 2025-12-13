@@ -1205,9 +1205,6 @@ async def search_nearby_places_with_mapbox(
                     properties = feature.get('properties', {})
                     geometry = feature.get('geometry', {})
                     
-                    # Debug log to see the structure
-                    logger.info(f"Mapbox feature properties: {properties}")
-                    
                     if geometry.get('coordinates'):
                         coords = geometry['coordinates']
                         place_lon, place_lat = coords[0], coords[1]
