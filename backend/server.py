@@ -2708,49 +2708,49 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
         # Create personalized system prompt for guest
         system_prompt = create_ai_system_prompt(apartment, branding)
         
+        # Initialize session_id for conversation history
+        session_id = chat_request.session_id or f"guest_{apartment_id}_{datetime.now().timestamp()}"
+        
         # If we have a proximity response, use it directly
         if proximity_response:
             response = proximity_response
         else:
-            # Initialize session_id for conversation history
-            session_id = chat_request.session_id or f"guest_{apartment_id}_{datetime.now().timestamp()}"
-        
-        # Get conversation history for context (last 10 messages)
-        recent_messages = await db.chat_messages.find(
-            {"session_id": session_id},
-            {"content": 1, "type": 1, "timestamp": 1, "_id": 0}
-        ).sort("timestamp", -1).limit(10).to_list(length=None)
-        
-        # Reverse to get chronological order
-        recent_messages.reverse()
-        
-        # Build conversation context
-        conversation_context = ""
-        if recent_messages:
-            conversation_context = "\n\n🧠 CONVERSATION CONTEXT TRACKING:\n"
-            conversation_context += "Recent conversation history:\n\n"
+            # Get conversation history for context (last 10 messages)
+            recent_messages = await db.chat_messages.find(
+                {"session_id": session_id},
+                {"content": 1, "type": 1, "timestamp": 1, "_id": 0}
+            ).sort("timestamp", -1).limit(10).to_list(length=None)
             
-            for i, msg in enumerate(recent_messages):
-                role = "Guest" if msg.get('type') == 'user' else "AI Assistant"
-                conversation_context += f"{role}: {msg.get('content', '')}\n"
+            # Reverse to get chronological order
+            recent_messages.reverse()
             
-            conversation_context += f"\nCurrent Guest Question: {chat_request.message}\n"
-            conversation_context += "\nAlways maintain conversation flow and context awareness.\n\n"
+            # Build conversation context
+            conversation_context = ""
+            if recent_messages:
+                conversation_context = "\n\n🧠 CONVERSATION CONTEXT TRACKING:\n"
+                conversation_context += "Recent conversation history:\n\n"
+                
+                for i, msg in enumerate(recent_messages):
+                    role = "Guest" if msg.get('type') == 'user' else "AI Assistant"
+                    conversation_context += f"{role}: {msg.get('content', '')}\n"
+                
+                conversation_context += f"\nCurrent Guest Question: {chat_request.message}\n"
+                conversation_context += "\nAlways maintain conversation flow and context awareness.\n\n"
+                
+                system_prompt += conversation_context
+                
+            # Initialize AI chat
+            api_key = os.environ.get('EMERGENT_LLM_KEY')
             
-            system_prompt += conversation_context
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=session_id,
+                system_message=system_prompt
+            ).with_model("openai", "gpt-4o-mini")
             
-        # Initialize AI chat
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
-        
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=session_id,
-            system_message=system_prompt
-        ).with_model("openai", "gpt-4o-mini")
-        
-        # Send message and get response
-        user_message = UserMessage(text=chat_request.message)
-        response = await chat.send_message(user_message)
+            # Send message and get response
+            user_message = UserMessage(text=chat_request.message)
+            response = await chat.send_message(user_message)
         
         # Save user message to database
         user_chat_message = ChatMessage(
