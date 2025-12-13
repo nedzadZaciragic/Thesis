@@ -1205,6 +1205,9 @@ async def search_nearby_places_with_mapbox(
                     properties = feature.get('properties', {})
                     geometry = feature.get('geometry', {})
                     
+                    # Debug log to see the structure
+                    logger.info(f"Mapbox feature properties: {properties}")
+                    
                     if geometry.get('coordinates'):
                         coords = geometry['coordinates']
                         place_lon, place_lat = coords[0], coords[1]
@@ -1217,8 +1220,14 @@ async def search_nearby_places_with_mapbox(
                         
                         # Only include places within radius
                         if distance <= radius_meters:
+                            # Try different name fields from Mapbox response
+                            name = (properties.get('name') or 
+                                   properties.get('full_address') or 
+                                   properties.get('address') or 
+                                   'Unknown Place')
+                            
                             places.append({
-                                'name': properties.get('name', 'Unknown'),
+                                'name': name,
                                 'address': properties.get('full_address', ''),
                                 'category': search_category,
                                 'distance': round(distance),
