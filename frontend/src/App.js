@@ -4431,7 +4431,6 @@ const HostDashboard = () => {
     brand_logo_url: user?.brand_logo_url || "",
     brand_primary_color: user?.brand_primary_color || BRAND_COLORS.primary,
     brand_secondary_color: user?.brand_secondary_color || BRAND_COLORS.secondary,
-    ai_tone: user?.ai_tone || "professional", // New: AI tone setting
     ai_assistant_name: user?.ai_assistant_name || "AI Assistant", // New: Custom AI assistant name
     custom_domain: user?.custom_domain || "",
     chat_background: user?.chat_background || "default",
