@@ -89,7 +89,7 @@ def send_test_email_smtp():
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="https://hostiq-chat.preview.emergentagent.com/guest/test-demo" 
+                <a href="https://sarajevo-finder.preview.emergentagent.com/guest/test-demo" 
                    class="button"
                    style="color: white;">
                     💬 Try the AI Chatbot
@@ -125,7 +125,7 @@ def send_test_email_smtp():
     print("=" * 70)
     print(f"\n📧 Attempting to send email to: {recipient}")
     print(f"📨 Subject: {subject}")
-    print(f"🔗 Chatbot Link: https://hostiq-chat.preview.emergentagent.com/guest/test-demo")
+    print(f"🔗 Chatbot Link: https://sarajevo-finder.preview.emergentagent.com/guest/test-demo")
     print("\n⚠️  NOTE: Without SMTP credentials configured, this is a simulation.")
     print("    In production, hosts configure their own email (Gmail, Outlook, etc.)")
     print("\n📋 Email Content Preview:")

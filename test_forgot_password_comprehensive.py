@@ -11,7 +11,7 @@ from datetime import datetime
 
 class ForgotPasswordTester:
     def __init__(self):
-        self.base_url = "https://hostiq-chat.preview.emergentagent.com"
+        self.base_url = "https://sarajevo-finder.preview.emergentagent.com"
         self.api_url = f"{self.base_url}/api"
         self.test_results = []
         

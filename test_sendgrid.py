@@ -58,7 +58,7 @@ def test_forgot_password_endpoint():
     
     try:
         # Test the endpoint
-        url = "https://hostiq-chat.preview.emergentagent.com/api/auth/forgot-password"
+        url = "https://sarajevo-finder.preview.emergentagent.com/api/auth/forgot-password"
         data = {"email": "test.sendgrid@example.com"}
         
         response = requests.post(url, json=data, timeout=30)

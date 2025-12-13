@@ -48,7 +48,7 @@ def test_sendgrid_integration():
         "sendgrid.test2@example.com"
     ]
     
-    base_url = "https://hostiq-chat.preview.emergentagent.com"
+    base_url = "https://sarajevo-finder.preview.emergentagent.com"
     
     for email in test_emails:
         print(f"\n   Testing with email: {email}")
