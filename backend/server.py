@@ -1099,6 +1099,208 @@ def extract_city_from_address(address: str) -> str:
     
     return "this area"
 
+async def geocode_address_with_mapbox(address: str) -> Optional[Dict[str, float]]:
+    """Geocode an address using Mapbox Geocoding API"""
+    try:
+        mapbox_api_key = os.environ.get('MAPBOX_API_KEY')
+        if not mapbox_api_key:
+            logger.error("MAPBOX_API_KEY not configured")
+            return None
+        
+        # Encode address for URL
+        encoded_address = requests.utils.quote(address)
+        
+        # Mapbox Geocoding API endpoint
+        url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_address}.json"
+        params = {
+            'access_token': mapbox_api_key,
+            'limit': 1
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('features') and len(data['features']) > 0:
+                    coordinates = data['features'][0]['geometry']['coordinates']
+                    # Mapbox returns [longitude, latitude]
+                    return {
+                        'longitude': coordinates[0],
+                        'latitude': coordinates[1]
+                    }
+                else:
+                    logger.warning(f"No geocoding results for address: {address}")
+                    return None
+            else:
+                logger.error(f"Mapbox geocoding failed: {response.status_code} - {response.text}")
+                return None
+                
+    except Exception as e:
+        logger.error(f"Geocoding error: {str(e)}")
+        return None
+
+async def search_nearby_places_with_mapbox(
+    latitude: float,
+    longitude: float, 
+    category: str,
+    radius_meters: int = 1000
+) -> List[Dict[str, Any]]:
+    """Search for nearby places using Mapbox Search API"""
+    try:
+        mapbox_api_key = os.environ.get('MAPBOX_API_KEY')
+        if not mapbox_api_key:
+            logger.error("MAPBOX_API_KEY not configured")
+            return []
+        
+        # Map common categories to Mapbox category names
+        category_mapping = {
+            'supermarket': 'supermarket',
+            'grocery': 'grocery',
+            'bakery': 'bakery',
+            'pharmacy': 'pharmacy',
+            'restaurant': 'restaurant',
+            'cafe': 'cafe',
+            'coffee': 'cafe',
+            'bar': 'bar',
+            'pub': 'bar',
+            'club': 'nightclub',
+            'nightclub': 'nightclub',
+            'atm': 'atm',
+            'bank': 'bank',
+            'hospital': 'hospital',
+            'doctor': 'clinic',
+            'shopping': 'shopping_mall',
+            'mall': 'shopping_mall',
+            'park': 'park',
+            'gym': 'gym',
+            'museum': 'museum',
+            'cinema': 'cinema',
+            'theater': 'theater',
+            'attraction': 'tourist_attraction',
+            'tourist': 'tourist_attraction'
+        }
+        
+        # Get the mapped category or use original
+        search_category = category_mapping.get(category.lower(), category.lower())
+        
+        # Mapbox Search Box API (v1)
+        url = f"https://api.mapbox.com/search/v1/category/{search_category}"
+        params = {
+            'access_token': mapbox_api_key,
+            'proximity': f"{longitude},{latitude}",
+            'limit': 10
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                places = []
+                for feature in data.get('features', []):
+                    properties = feature.get('properties', {})
+                    geometry = feature.get('geometry', {})
+                    
+                    if geometry.get('coordinates'):
+                        coords = geometry['coordinates']
+                        place_lon, place_lat = coords[0], coords[1]
+                        
+                        # Calculate distance using Haversine formula
+                        distance = calculate_haversine_distance(
+                            latitude, longitude,
+                            place_lat, place_lon
+                        )
+                        
+                        # Only include places within radius
+                        if distance <= radius_meters:
+                            places.append({
+                                'name': properties.get('name', 'Unknown'),
+                                'address': properties.get('full_address', ''),
+                                'category': search_category,
+                                'distance': round(distance),
+                                'latitude': place_lat,
+                                'longitude': place_lon
+                            })
+                
+                # Sort by distance
+                places.sort(key=lambda x: x['distance'])
+                return places[:5]  # Return top 5 closest
+            else:
+                logger.error(f"Mapbox search failed: {response.status_code} - {response.text}")
+                return []
+                
+    except Exception as e:
+        logger.error(f"Nearby search error: {str(e)}")
+        return []
+
+def calculate_haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculate distance between two coordinates using Haversine formula (in meters)"""
+    from math import radians, sin, cos, sqrt, atan2
+    
+    # Earth radius in meters
+    R = 6371000
+    
+    # Convert to radians
+    lat1_rad = radians(lat1)
+    lat2_rad = radians(lat2)
+    delta_lat = radians(lat2 - lat1)
+    delta_lon = radians(lon2 - lon1)
+    
+    # Haversine formula
+    a = sin(delta_lat / 2) ** 2 + cos(lat1_rad) * cos(lat2_rad) * sin(delta_lon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    distance = R * c
+    
+    return distance
+
+async def get_cached_places(apartment_id: str, category: str) -> Optional[List[Dict[str, Any]]]:
+    """Get cached places from database"""
+    try:
+        cache_key = f"{apartment_id}_{category}"
+        cached = await db.places_cache.find_one({"cache_key": cache_key})
+        
+        if cached:
+            # Check if cache is still valid (24 hours)
+            expires_at = cached.get('expires_at')
+            if isinstance(expires_at, str):
+                expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            
+            if datetime.now(timezone.utc) < expires_at:
+                return cached.get('results', [])
+        
+        return None
+    except Exception as e:
+        logger.error(f"Cache retrieval error: {str(e)}")
+        return None
+
+async def cache_places(apartment_id: str, category: str, places: List[Dict[str, Any]]):
+    """Cache places results in database"""
+    try:
+        cache_key = f"{apartment_id}_{category}"
+        now = datetime.now(timezone.utc)
+        expires_at = now + timedelta(hours=24)
+        
+        cache_doc = {
+            "cache_key": cache_key,
+            "apartment_id": apartment_id,
+            "category": category,
+            "results": places,
+            "cached_at": now.isoformat(),
+            "expires_at": expires_at.isoformat()
+        }
+        
+        # Upsert (update if exists, insert if not)
+        await db.places_cache.update_one(
+            {"cache_key": cache_key},
+            {"$set": cache_doc},
+            upsert=True
+        )
+    except Exception as e:
+        logger.error(f"Cache storage error: {str(e)}")
+
 def create_ai_system_prompt(apartment_data: dict, user_branding: dict) -> str:
     """Create a personalized AI system prompt based on apartment data and branding"""
     brand_name = user_branding.get('brand_name', 'My Host IQ')
