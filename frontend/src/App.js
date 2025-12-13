@@ -4444,7 +4444,6 @@ const HostDashboard = () => {
     description: "",
     rules: [],
     contact: { phone: "", email: "", whatsapp: "" },
-    ai_tone: "professional",
     recommendations: {
       restaurants: [],
       hidden_gems: [],
