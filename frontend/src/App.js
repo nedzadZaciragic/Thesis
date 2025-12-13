@@ -4992,15 +4992,6 @@ const HostDashboard = () => {
                         </div>
                       )}
                       
-                      {apartment.ai_tone && (
-                        <div className="flex items-center text-blue-700 p-2 bg-blue-50 rounded-lg">
-                          <Bot className="h-4 w-4 mr-2" />
-                          <span className="text-xs font-medium capitalize">
-                            AI Tone: {apartment.ai_tone}
-                          </span>
-                        </div>
-                      )}
-                      
                       {apartment.rules?.length > 0 && (
                         <div className="flex items-center text-orange-700 p-2 bg-orange-50 rounded-lg">
                           <Shield className="h-4 w-4 mr-2" />
