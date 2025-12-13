@@ -268,6 +268,9 @@ class ApartmentCreate(BaseModel):
     wifi_network: str = ""
     wifi_password: str = ""
     wifi_instructions: str = ""
+    # Geocoding coordinates (from Mapbox)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class ApartmentUpdate(BaseModel):
     name: str
