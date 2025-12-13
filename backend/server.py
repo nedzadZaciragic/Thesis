@@ -1190,7 +1190,8 @@ async def search_nearby_places_with_mapbox(
         params = {
             'access_token': mapbox_api_key,
             'proximity': f"{longitude},{latitude}",
-            'limit': 10
+            'limit': 10,
+            'language': 'en'
         }
         
         async with httpx.AsyncClient(timeout=10.0) as client:
