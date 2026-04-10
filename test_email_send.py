@@ -21,7 +21,7 @@ def send_test_email():
     guest_email = "nedzadzaciragic7@gmail.com"
     guest_name = "Nedzad"
     apartment_name = "Test Apartment - MyHostIQ Demo"
-    chatbot_link = "https://sarajevo-finder.preview.emergentagent.com/guest/test-apartment-id"
+    chatbot_link = "https://proximity-search-8.preview.emergentagent.com/guest/test-apartment-id"
     
     subject = f"🏠 Welcome to {apartment_name} - Your AI Assistant is Ready!"
     

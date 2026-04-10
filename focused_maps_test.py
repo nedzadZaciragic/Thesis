@@ -10,7 +10,7 @@ def test_google_maps_links():
     print("=" * 60)
     
     # Test configuration
-    base_url = "https://sarajevo-finder.preview.emergentagent.com"
+    base_url = "https://proximity-search-8.preview.emergentagent.com"
     apartment_id = "00a4b62a-9410-478f-a536-08628dc54df1"
     test_message = "Where should I eat tonight? Any local restaurant recommendations?"
     

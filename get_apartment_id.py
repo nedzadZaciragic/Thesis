@@ -11,7 +11,7 @@ import sys
 def get_apartment_id():
     """Get a valid apartment ID for testing guest chat"""
     
-    base_url = "https://sarajevo-finder.preview.emergentagent.com"
+    base_url = "https://proximity-search-8.preview.emergentagent.com"
     api_url = f"{base_url}/api"
     
     print("🔍 Getting apartment ID for guest chat testing...")
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     
     if apartment_id:
         print(f"\n✅ SUCCESS: Use apartment ID '{apartment_id}' for guest chat testing")
-        print(f"🔗 Test URL: https://sarajevo-finder.preview.emergentagent.com/guest/{apartment_id}")
+        print(f"🔗 Test URL: https://proximity-search-8.preview.emergentagent.com/guest/{apartment_id}")
         sys.exit(0)
     else:
         print(f"\n❌ FAILED: Could not get apartment ID")

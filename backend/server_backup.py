@@ -1071,7 +1071,7 @@ async def sync_apartment_calendar(apartment_id: str):
                 continue
                 
             # Create guest URL - use the actual frontend URL
-            guest_url = f"https://sarajevo-finder.preview.emergentagent.com/guest/{apartment_id}"
+            guest_url = f"https://proximity-search-8.preview.emergentagent.com/guest/{apartment_id}"
             if user.get('custom_domain'):
                 guest_url = f"https://{user['custom_domain']}/guest/{apartment_id}"
             

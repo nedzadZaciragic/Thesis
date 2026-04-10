@@ -6,7 +6,7 @@ import time
 def test_markdown_consistency():
     """Test consistency of markdown removal across multiple requests"""
     
-    base_url = "https://sarajevo-finder.preview.emergentagent.com/api"
+    base_url = "https://proximity-search-8.preview.emergentagent.com/api"
     apartment_id = "00a4b62a-9410-478f-a536-08628dc54df1"
     
     # Test queries that might trigger markdown
