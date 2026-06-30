@@ -2196,208 +2196,140 @@ const GuestChat = ({ apartmentId }) => {
   const primaryColor = branding.brand_primary_color || BRAND_COLORS.primary;
 
   return (
-    <div className="h-screen bg-white flex flex-col fixed inset-0 overflow-hidden">
-      {/* Header - Blue gradient like in image */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white flex-shrink-0 z-10">
-        <div className="flex items-center space-x-3">
-          <div className="bg-white/20 p-0 rounded-lg w-12 h-12 flex items-center justify-center overflow-hidden">
+    <div className="h-screen flex flex-col fixed inset-0 overflow-hidden" style={{ background: '#f9fafb' }}>
+      {/* Minimal Header */}
+      <div className="flex-shrink-0 z-10 border-b border-gray-200 bg-white">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden" style={{ background: primaryColor + '15' }}>
             {branding.brand_logo_url ? (
               <img 
                 src={branding.brand_logo_url} 
-                alt="Brand Logo" 
-                className="w-full h-full object-cover rounded-lg"
-                onError={(e) => {
-                  // Fallback to Bot icon if image fails to load
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'block';
-                }}
+                alt="Logo" 
+                className="w-full h-full object-cover rounded-full"
+                onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }}
               />
             ) : null}
-            <Bot className={`h-6 w-6 ${branding.brand_logo_url ? 'hidden' : 'block'}`} />
+            <Bot className={`h-5 w-5 ${branding.brand_logo_url ? 'hidden' : 'block'}`} style={{ color: primaryColor }} />
           </div>
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold">{branding.brand_name || 'MyHostIQ'}</h1>
-            <p className="text-sm opacity-90">
-              Your personal concierge for this stay
-            </p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-sm font-semibold text-gray-900 truncate">{branding.brand_name || 'MyHostIQ'}</h1>
+            <p className="text-xs text-gray-500">{apartmentInfo?.name || 'AI Concierge'}</p>
+          </div>
+          <div className="flex items-center space-x-1">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-400"></span>
+            <span className="text-xs text-gray-500">Online</span>
           </div>
         </div>
       </div>
 
-      {/* Messages Container - MORE SPACE FOR RAISED INPUT */}
+      {/* Messages Area */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 bg-white chat-messages relative"
+        className="flex-1 overflow-y-auto"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{ 
           transform: `translateY(${pullDistance * 0.5}px)`,
           transition: pullDistance === 0 ? 'transform 0.3s ease' : 'none',
-          WebkitOverflowScrolling: 'touch',
-          paddingBottom: '20px',
-          marginBottom: '220px' // Much more space for full AI responses to be visible above suggestions
+          WebkitOverflowScrolling: 'touch'
         }}
       >
-        {/* Pull-to-refresh indicator - MATCHES WHITE BACKGROUND */}
-        {pullDistance > 0 && (
-          <div 
-            className="absolute top-0 left-0 right-0 flex flex-col items-center justify-center text-blue-600 z-20 bg-white"
-            style={{ 
-              top: `-${Math.min(60, pullDistance)}px`,
-              height: `${Math.min(60, pullDistance)}px`,
-              borderBottomLeftRadius: '0px',
-              borderBottomRightRadius: '0px'
-            }}
-          >
-            <div className={`rounded-full p-2 bg-blue-50 shadow-sm ${isRefreshing ? 'animate-spin' : ''}`}>
-              {isRefreshing ? (
-                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full" 
-                     style={{ transform: `rotate(${pullDistance * 3}deg)` }}>
-                </div>
-              )}
-            </div>
-            <p className="text-xs mt-1 text-blue-600 font-medium">
-              {pullDistance > 60 ? 'Release to refresh' : 'Pull to refresh'}
-            </p>
-          </div>
-        )}
-
-        {messages.map((message, index) => (
-          <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] sm:max-w-[80%] ${message.type === 'user' ? 'ml-12' : 'mr-12'}`}>
+        <div className="max-w-3xl mx-auto px-4 py-6 space-y-6" style={{ paddingBottom: '200px' }}>
+          {messages.map((message, index) => (
+            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`} data-testid={`chat-message-${index}`}>
               {message.type === 'ai' && (
-                <div className="flex items-center space-x-2 mb-2">
-                  <div className="bg-gray-100 p-0 rounded-full w-8 h-8 flex items-center justify-center overflow-hidden">
-                    {branding.brand_logo_url ? (
-                      <img 
-                        src={branding.brand_logo_url} 
-                        alt="Brand Logo" 
-                        className="w-full h-full object-cover rounded-full"
-                        onError={(e) => {
-                          // Fallback to Bot icon if image fails to load
-                          e.target.style.display = 'none';
-                          e.target.nextSibling.style.display = 'block';
-                        }}
-                      />
-                    ) : null}
-                    <Bot className={`h-4 w-4 text-gray-600 ${branding.brand_logo_url ? 'hidden' : 'block'}`} />
-                  </div>
-                  <span className="text-sm text-gray-600 font-medium">{branding.ai_assistant_name || 'AI Assistant'}</span>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center mr-3 mt-1 flex-shrink-0" style={{ background: primaryColor + '12' }}>
+                  <Bot className="h-4 w-4" style={{ color: primaryColor }} />
                 </div>
               )}
-              <div className={`p-3 sm:p-4 rounded-2xl ${
-                message.type === 'user' 
-                  ? 'bg-blue-500 text-white rounded-br-md' 
-                  : 'bg-gray-100 text-gray-900 rounded-bl-md'
-              }`}>
-                <div className="text-sm leading-relaxed whitespace-pre-line break-words">
-                  {renderTextWithLinks(message.content)}
+              <div className={`max-w-[85%] sm:max-w-[75%] ${message.type === 'user' ? '' : ''}`}>
+                <div className={`px-4 py-3 text-sm leading-relaxed ${
+                  message.type === 'user' 
+                    ? 'bg-gray-900 text-white rounded-3xl rounded-br-lg' 
+                    : 'bg-white text-gray-800 rounded-3xl rounded-bl-lg shadow-sm border border-gray-100'
+                }`}>
+                  <div className="whitespace-pre-line break-words">
+                    {renderTextWithLinks(message.content)}
+                  </div>
                 </div>
-                <p className={`text-xs mt-2 ${message.type === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
-                  {new Date(message.timestamp).toLocaleTimeString()}
+                <p className={`text-[10px] mt-1 px-2 ${message.type === 'user' ? 'text-right text-gray-400' : 'text-gray-400'}`}>
+                  {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>
-          </div>
-        ))}
-        
-        {loading && (
-          <div className="flex justify-start">
-            <div className="max-w-[85%] sm:max-w-[80%] mr-12">
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="bg-gray-100 p-0 rounded-full w-8 h-8 flex items-center justify-center overflow-hidden">
-                  {branding.brand_logo_url ? (
-                    <img 
-                      src={branding.brand_logo_url} 
-                      alt="Brand Logo" 
-                      className="w-full h-full object-cover rounded-full"
-                      onError={(e) => {
-                        // Fallback to Bot icon if image fails to load
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'block';
-                      }}
-                    />
-                  ) : null}
-                  <Bot className={`h-4 w-4 text-gray-600 ${branding.brand_logo_url ? 'hidden' : 'block'}`} />
-                </div>
-                <span className="text-sm text-gray-600 font-medium">{branding.ai_assistant_name || 'AI Assistant'}</span>
+          ))}
+          
+          {loading && (
+            <div className="flex justify-start">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center mr-3 mt-1 flex-shrink-0" style={{ background: primaryColor + '12' }}>
+                <Bot className="h-4 w-4" style={{ color: primaryColor }} />
               </div>
-              <div className="bg-gray-100 p-3 sm:p-4 rounded-2xl rounded-bl-md">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+              <div className="bg-white px-4 py-3 rounded-3xl rounded-bl-lg shadow-sm border border-gray-100">
+                <div className="flex space-x-1.5 items-center h-5">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.15s'}}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.3s'}}></div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-        
-        {/* Invisible scroll anchor */}
-        <div ref={messagesEndRef} />
+          )}
+          
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Fixed Input at Bottom - RAISED HIGHER FOR MOBILE */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-20" 
-           style={{ 
-             paddingBottom: 'max(env(safe-area-inset-bottom), 20px)',
-             boxShadow: '0 -2px 10px rgba(0,0,0,0.1)',
-             bottom: '20px' // Raise input 20px higher
-           }}>
-        <div className="p-4">
-          {/* Enhanced Suggestions - Better mobile display */}
-          <div className="mb-3">
-            <div className="flex flex-wrap gap-2 sm:gap-3">
+      {/* Input Area - Claude/ChatGPT style */}
+      <div className="flex-shrink-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 z-20">
+        <div className="max-w-3xl mx-auto px-4 pb-4" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+          {/* Quick Actions */}
+          {messages.length <= 1 && (
+            <div className="mb-3 flex flex-wrap gap-2" data-testid="quick-actions">
               {[
-                'How do I check in?', 
-                'What\'s the WiFi password?', 
-                'Where are the towels?', 
-                'Best nearby restaurants?',
-                'Emergency contacts?',
-                'House rules?'
+                { text: 'Check-in instructions', icon: '🔑' },
+                { text: 'WiFi password', icon: '📶' },
+                { text: 'House rules', icon: '📋' },
+                { text: 'Nearby restaurants', icon: '🍽️' },
+                { text: 'Emergency info', icon: '🆘' },
+                { text: 'Where are towels?', icon: '🛁' }
               ].map((suggestion) => (
                 <button
-                  key={suggestion}
-                  onClick={() => setInputMessage(suggestion)}
-                  className="text-xs sm:text-sm px-3 py-2 bg-blue-50 border border-blue-200 rounded-full hover:bg-blue-100 transition-colors text-blue-700 font-medium whitespace-nowrap"
+                  key={suggestion.text}
+                  onClick={() => { setInputMessage(suggestion.text); }}
+                  className="text-xs px-3 py-1.5 bg-white border border-gray-200 rounded-full hover:border-gray-400 hover:bg-gray-50 transition-all text-gray-700 whitespace-nowrap shadow-sm"
+                  data-testid={`suggestion-${suggestion.text.toLowerCase().replace(/\s/g, '-')}`}
                 >
-                  {suggestion}
+                  <span className="mr-1">{suggestion.icon}</span>
+                  {suggestion.text}
                 </button>
               ))}
             </div>
-          </div>
+          )}
           
-          {/* Message Input - BACK TO NORMAL */}
-          <div className="flex space-x-3 items-end">
-            <div className="flex-1 relative">
-              <Input
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Ask about check-in, restaurants, rules..."
-                className="pr-4 py-3 rounded-2xl border-gray-300 resize-none text-base"
-                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                disabled={loading}
-                style={{ 
-                  minHeight: '44px',
-                  fontSize: '16px' // Prevents zoom on iOS
-                }}
-              />
-            </div>
+          {/* Input Box */}
+          <div className="relative bg-white rounded-2xl border border-gray-200 shadow-sm focus-within:border-gray-400 focus-within:shadow-md transition-all">
+            <Input
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              placeholder="Ask me anything about your stay..."
+              className="border-0 focus:ring-0 focus-visible:ring-0 rounded-2xl pr-12 py-3 text-sm bg-transparent"
+              onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+              disabled={loading}
+              style={{ fontSize: '16px', boxShadow: 'none' }}
+              data-testid="chat-input"
+            />
             <Button 
               onClick={sendMessage} 
               disabled={loading || !inputMessage.trim()}
-              className="bg-blue-500 hover:bg-blue-600 rounded-full w-11 h-11 p-0 flex-shrink-0"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl w-8 h-8 p-0 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-colors"
+              data-testid="send-button"
             >
-              <Send className="h-5 w-5" />
+              <Send className="h-3.5 w-3.5" />
             </Button>
           </div>
           
-          {/* Help text */}
-          <p className="text-xs text-gray-500 mt-2 text-center">
-            Need urgent help? Contact your host directly via your booking confirmation
+          <p className="text-[10px] text-gray-400 mt-2 text-center">
+            AI assistant for {apartmentInfo?.name} • Powered by {branding.brand_name || 'MyHostIQ'}
           </p>
         </div>
       </div>
@@ -2625,24 +2557,20 @@ const AnalyticsDashboard = () => {
                   </h4>
                   {apartment.popular_questions && apartment.popular_questions.length > 0 ? (
                     <div className="space-y-3">
-                      {apartment.popular_questions.slice(0, 3).map((qa, index) => (
+                      {apartment.popular_questions.slice(0, 5).map((qa, index) => (
                         <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                          <div className="mb-2">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-blue-600">Question:</span>
-                              <div className="flex items-center space-x-2">
-                                <Badge variant="outline">{qa.count} times</Badge>
-                                {qa.percentage && <Badge variant="secondary">{qa.percentage}%</Badge>}
-                              </div>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-semibold text-gray-800">{qa.question}</span>
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="outline">{qa.count}x</Badge>
+                              {qa.percentage > 0 && <Badge variant="secondary">{qa.percentage}%</Badge>}
                             </div>
-                            <p className="text-sm text-gray-800">{qa.question}</p>
                           </div>
-                          {qa.latest_response && (
-                            <div>
-                              <span className="text-xs font-medium text-green-600">Latest AI Response:</span>
-                              <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                {qa.latest_response.substring(0, 150)}...
-                              </p>
+                          {qa.examples && qa.examples.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {qa.examples.map((ex, i) => (
+                                <p key={i} className="text-xs text-gray-500 italic">"{ex}"</p>
+                              ))}
                             </div>
                           )}
                         </div>

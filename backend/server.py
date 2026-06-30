@@ -3101,24 +3101,69 @@ async def get_analytics_dashboard(current_user: User = Depends(get_current_user)
             rate_docs = await db.rate_limits.find({"apartment_id": apt_id}).to_list(100)
             total_guest_views += sum(r.get('count', 0) for r in rate_docs)
             
-            # Calculate REAL popular questions based on actual messages
-            question_frequency = {}
-            for msg in messages:
-                question = msg.get('message', '').strip()
-                if question and len(question) > 10:  # Only meaningful questions
-                    # Normalize question for better grouping
-                    normalized = question.lower().strip('?.,!').strip()
-                    question_frequency[normalized] = question_frequency.get(normalized, 0) + 1
+            # Calculate REAL popular questions with SMART SEMANTIC GROUPING
+            # Group similar questions regardless of language or phrasing
+            QUESTION_CATEGORIES = {
+                "wifi": {"keywords": ["wifi", "wi-fi", "password", "internet", "lozinka", "sifra", "šifra", "wlan", "netz", "passwort", "mot de passe", "contraseña"], "label": "WiFi & Internet"},
+                "checkin": {"keywords": ["check in", "checkin", "check-in", "arrival", "arrive", "key", "keys", "lockbox", "door", "enter", "entrance", "kako uci", "kako ući", "ulaz", "ključ", "kljuc", "dolazak", "prijava", "einchecken", "schlüssel", "arrivée", "llegada"], "label": "Check-in & Access"},
+                "checkout": {"keywords": ["check out", "checkout", "check-out", "leave", "leaving", "departure", "odjava", "odlazak", "kad moram", "kada moram", "auschecken", "départ", "salida"], "label": "Check-out"},
+                "smoking": {"keywords": ["smok", "cigarett", "pušen", "pusen", "pusiti", "pušiti", "pusi", "puši", "duhan", "rauchen", "fumer", "fumar"], "label": "Smoking Policy"},
+                "parking": {"keywords": ["park", "car", "garage", "auto", "parking", "parkiraliste", "parkiralište", "voiture", "coche", "parkplatz"], "label": "Parking"},
+                "towels": {"keywords": ["towel", "peškir", "peskir", "ručnik", "rucnik", "handtuch", "serviette", "toalla"], "label": "Towels & Linens"},
+                "restaurants": {"keywords": ["restaurant", "eat", "food", "dinner", "lunch", "breakfast", "restoran", "hrana", "jesti", "essen", "manger", "comer", "recommend", "preporuk"], "label": "Restaurant Recommendations"},
+                "rules": {"keywords": ["rule", "rules", "allowed", "forbidden", "prohibit", "pravil", "smije", "može", "moze", "dozvol", "zabranjen", "regel", "règle", "regla"], "label": "House Rules"},
+                "location": {"keywords": ["near", "nearest", "close", "closest", "where is", "where can", "gdje", "gde", "blizu", "najbliz", "najbliž", "supermarket", "pharmacy", "apoteka", "hospital", "bolnica", "wo ist", "où est", "dónde"], "label": "Nearby Places"},
+                "transport": {"keywords": ["taxi", "bus", "tram", "airport", "transport", "uber", "prevoz", "aerodrom", "autobus", "tramvaj", "flughafen", "aéroport", "aeropuerto"], "label": "Transport & Getting Around"},
+                "emergency": {"keywords": ["emergency", "help", "urgent", "police", "ambulance", "hospital", "hitno", "hitna", "policija", "bolnica", "notfall", "urgence", "emergencia"], "label": "Emergency & Safety"},
+                "cleaning": {"keywords": ["clean", "cleaning", "wash", "laundry", "vacuum", "čišćen", "ciscen", "pranje", "veš", "ves", "reinigung", "nettoyage", "limpieza"], "label": "Cleaning & Laundry"},
+                "kitchen": {"keywords": ["kitchen", "cook", "coffee", "kuhinja", "kuhin", "kafa", "kava", "küche", "cuisine", "cocina", "microwave", "fridge"], "label": "Kitchen & Appliances"},
+            }
             
-            # Get top 5 most frequent questions
+            question_groups = {}
+            uncategorized = {}
+            for msg in messages:
+                if msg.get('type') != 'user':
+                    continue
+                question = msg.get('content', '').strip()
+                if not question or len(question) < 5:
+                    continue
+                q_lower = question.lower()
+                
+                matched = False
+                for cat_key, cat_data in QUESTION_CATEGORIES.items():
+                    if any(kw in q_lower for kw in cat_data["keywords"]):
+                        if cat_key not in question_groups:
+                            question_groups[cat_key] = {"label": cat_data["label"], "count": 0, "examples": []}
+                        question_groups[cat_key]["count"] += 1
+                        if len(question_groups[cat_key]["examples"]) < 2:
+                            question_groups[cat_key]["examples"].append(question)
+                        matched = True
+                        break
+                
+                if not matched:
+                    normalized = q_lower.strip('?.,!').strip()
+                    uncategorized[normalized] = uncategorized.get(normalized, 0) + 1
+            
+            # Build popular questions from grouped data
             popular_questions = []
-            if question_frequency:
-                sorted_questions = sorted(question_frequency.items(), key=lambda x: x[1], reverse=True)
-                for question, count in sorted_questions[:5]:
+            sorted_groups = sorted(question_groups.values(), key=lambda x: x["count"], reverse=True)
+            user_msg_count = len([m for m in messages if m.get('type') == 'user'])
+            for group in sorted_groups[:5]:
+                popular_questions.append({
+                    "question": group["label"],
+                    "count": group["count"],
+                    "percentage": round((group["count"] / max(user_msg_count, 1)) * 100, 1),
+                    "examples": group["examples"]
+                })
+            
+            # Add top uncategorized if we have less than 5
+            if len(popular_questions) < 5 and uncategorized:
+                sorted_uncat = sorted(uncategorized.items(), key=lambda x: x[1], reverse=True)
+                for q, count in sorted_uncat[:5 - len(popular_questions)]:
                     popular_questions.append({
-                        "question": question.capitalize(),
+                        "question": q.capitalize(),
                         "count": count,
-                        "percentage": round((count / len(messages)) * 100, 1) if messages else 0
+                        "percentage": round((count / max(user_msg_count, 1)) * 100, 1)
                     })
             
             # If no questions yet, show helpful placeholder
