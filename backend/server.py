@@ -1590,7 +1590,8 @@ async def register_user(request: Request, user_data: UserCreate):
                 "email": user.email,
                 "full_name": user.full_name,
                 "brand_name": user.brand_name,
-                "phone": user.phone
+                "phone": user.phone,
+                "created_at": user.created_at.isoformat() if user.created_at else datetime.now(timezone.utc).isoformat()
             }
         )
         
@@ -1691,7 +1692,8 @@ async def login(request: Request, user_data: UserLogin):
                 "email": user['email'],
                 "full_name": user['full_name'],
                 "brand_name": user.get('brand_name', 'MyHostIQ'),
-                "phone": user.get('phone', '')
+                "phone": user.get('phone', ''),
+                "created_at": user.get('created_at', '')
             }
         )
         
@@ -1890,7 +1892,8 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
         "chat_background": current_user.chat_background,
         "chat_font": current_user.chat_font,
         "email_verified": current_user.email_verified,
-        "phone_verified": current_user.phone_verified
+        "phone_verified": current_user.phone_verified,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None
     }
 
 @api_router.put("/auth/whitelabel")
@@ -3070,12 +3073,33 @@ async def get_analytics_dashboard(current_user: User = Depends(get_current_user)
         analytics_data = []
         total_chats = 0
         total_apartments = len(apartments)
+        total_sessions = 0
+        total_guest_views = 0
+        total_successful_responses = 0
+        total_user_messages = 0
         
         for apartment in apartments:
             apt_id = apartment['id']
             
             # Get chat messages for this apartment
             messages = await db.chat_messages.find({"apartment_id": apt_id}).to_list(1000)
+            
+            # Count user messages vs assistant responses for quality stats
+            user_msgs = [m for m in messages if m.get('type') == 'user']
+            assistant_msgs = [m for m in messages if m.get('type') == 'assistant']
+            successful = [m for m in assistant_msgs if m.get('content') and 
+                         'trouble connecting' not in m.get('content', '').lower() and
+                         'temporarily unavailable' not in m.get('content', '').lower()]
+            total_user_messages += len(user_msgs)
+            total_successful_responses += len(successful)
+            
+            # Count unique sessions for guest views
+            apt_sessions = set(m.get('session_id', '') for m in messages if m.get('session_id'))
+            total_sessions += len(apt_sessions)
+            
+            # Count rate limit hits as guest views proxy
+            rate_docs = await db.rate_limits.find({"apartment_id": apt_id}).to_list(100)
+            total_guest_views += sum(r.get('count', 0) for r in rate_docs)
             
             # Calculate REAL popular questions based on actual messages
             question_frequency = {}
@@ -3169,12 +3193,21 @@ async def get_analytics_dashboard(current_user: User = Depends(get_current_user)
                 peak_hours=peak_hours
             ))
         
+        # Calculate AI response quality from real data
+        if total_user_messages > 0:
+            ai_quality = round((total_successful_responses / total_user_messages) * 100, 1)
+        else:
+            ai_quality = 0
+        
         return {
             "overview": {
                 "total_apartments": total_apartments,
                 "total_chats": total_chats,
                 "active_apartments": len([apt for apt in apartments if apt.get('last_chat')]),
-                "avg_chats_per_apartment": total_chats / max(total_apartments, 1)
+                "avg_chats_per_apartment": total_chats / max(total_apartments, 1),
+                "ai_response_quality": ai_quality,
+                "total_sessions": total_sessions,
+                "total_guest_views": total_guest_views
             },
             "apartments": analytics_data
         }

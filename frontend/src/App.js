@@ -21,11 +21,233 @@ import {
   Activity, Download, Upload, Link as LinkIcon, PieChart, Car,
   QrCode, FileText, Printer, MousePointer, Smartphone, UserPlus,
   PaintBucket, BarChart, Target, Sparkles, Edit, AlertTriangle,
-  Headphones, Volume2, VolumeX, BookOpen, Briefcase, Trash2, Check
+  Headphones, Volume2, VolumeX, BookOpen, Briefcase, Trash2, Check,
+  ChevronDown, AlertCircle
 } from "lucide-react";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
+
+// ── Country code list for phone input ──
+const COUNTRY_CODES = [
+  { code: "+387", country: "BA", flag: "🇧🇦" },
+  { code: "+385", country: "HR", flag: "🇭🇷" },
+  { code: "+381", country: "RS", flag: "🇷🇸" },
+  { code: "+382", country: "ME", flag: "🇲🇪" },
+  { code: "+389", country: "MK", flag: "🇲🇰" },
+  { code: "+386", country: "SI", flag: "🇸🇮" },
+  { code: "+43", country: "AT", flag: "🇦🇹" },
+  { code: "+49", country: "DE", flag: "🇩🇪" },
+  { code: "+41", country: "CH", flag: "🇨🇭" },
+  { code: "+39", country: "IT", flag: "🇮🇹" },
+  { code: "+33", country: "FR", flag: "🇫🇷" },
+  { code: "+34", country: "ES", flag: "🇪🇸" },
+  { code: "+44", country: "GB", flag: "🇬🇧" },
+  { code: "+1", country: "US", flag: "🇺🇸" },
+  { code: "+90", country: "TR", flag: "🇹🇷" },
+  { code: "+31", country: "NL", flag: "🇳🇱" },
+  { code: "+46", country: "SE", flag: "🇸🇪" },
+  { code: "+48", country: "PL", flag: "🇵🇱" },
+  { code: "+30", country: "GR", flag: "🇬🇷" },
+  { code: "+420", country: "CZ", flag: "🇨🇿" },
+  { code: "+36", country: "HU", flag: "🇭🇺" },
+  { code: "+40", country: "RO", flag: "🇷🇴" },
+  { code: "+61", country: "AU", flag: "🇦🇺" },
+  { code: "+971", country: "AE", flag: "🇦🇪" },
+];
+
+// ── Phone Input with Country Code Selector ──
+const PhoneInput = ({ value, onChange, placeholder = "Phone number", required = false }) => {
+  const [countryCode, setCountryCode] = useState("+387");
+  const [localNumber, setLocalNumber] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (value) {
+      const matched = COUNTRY_CODES.find(c => value.startsWith(c.code));
+      if (matched) {
+        setCountryCode(matched.code);
+        setLocalNumber(value.slice(matched.code.length).trim());
+      } else {
+        setLocalNumber(value);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLocalChange = (e) => {
+    const num = e.target.value.replace(/[^0-9\s-]/g, '');
+    setLocalNumber(num);
+    onChange(num ? `${countryCode} ${num}` : "");
+  };
+
+  const handleCodeSelect = (code) => {
+    setCountryCode(code);
+    setDropdownOpen(false);
+    onChange(localNumber ? `${code} ${localNumber}` : "");
+  };
+
+  const selectedCountry = COUNTRY_CODES.find(c => c.code === countryCode);
+
+  return (
+    <div className="flex gap-1">
+      <div className="relative" ref={dropdownRef}>
+        <button
+          type="button"
+          onClick={() => setDropdownOpen(!dropdownOpen)}
+          className="flex items-center gap-1 h-10 px-2 border rounded-md bg-gray-50 hover:bg-gray-100 text-sm min-w-[90px] justify-between"
+          data-testid="country-code-selector"
+        >
+          <span>{selectedCountry?.flag} {countryCode}</span>
+          <ChevronDown className="h-3 w-3 text-gray-500" />
+        </button>
+        {dropdownOpen && (
+          <div className="absolute z-50 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto w-48">
+            {COUNTRY_CODES.map((c) => (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => handleCodeSelect(c.code)}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2 ${c.code === countryCode ? 'bg-blue-50 font-medium' : ''}`}
+              >
+                <span>{c.flag}</span>
+                <span>{c.country}</span>
+                <span className="text-gray-500 ml-auto">{c.code}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <Input
+        type="tel"
+        placeholder={placeholder}
+        value={localNumber}
+        onChange={handleLocalChange}
+        required={required}
+        className="flex-1"
+        data-testid="phone-number-input"
+      />
+    </div>
+  );
+};
+
+// ── Email Input with Validation ──
+const EmailInput = ({ value, onChange, placeholder = "Email address", required = false, ...props }) => {
+  const [touched, setTouched] = useState(false);
+  const isValid = !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const showError = touched && value && !isValid;
+
+  return (
+    <div className="w-full">
+      <div className="relative">
+        <Input
+          type="email"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={() => setTouched(true)}
+          required={required}
+          className={showError ? "border-red-400 focus:ring-red-400 pr-10" : ""}
+          data-testid="email-input"
+          {...props}
+        />
+        {showError && (
+          <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-red-500" />
+        )}
+      </div>
+      {showError && (
+        <p className="text-xs text-red-500 mt-1">Please enter a valid email address</p>
+      )}
+    </div>
+  );
+};
+
+// ── Time Picker Component ──
+const TimePicker = ({ value, onChange, label }) => {
+  const [hour, setHour] = useState("12");
+  const [minute, setMinute] = useState("00");
+  const [period, setPeriod] = useState("PM");
+
+  useEffect(() => {
+    if (value) {
+      // Parse existing value (handles "15:00", "3:00 PM", etc.)
+      const pm = /pm/i.test(value);
+      const am = /am/i.test(value);
+      const nums = value.replace(/[^\d:]/g, '').split(':');
+      let h = parseInt(nums[0]) || 12;
+      const m = nums[1] || "00";
+
+      if (!am && !pm) {
+        // 24h format
+        if (h >= 12) { setPeriod("PM"); h = h === 12 ? 12 : h - 12; }
+        else { setPeriod("AM"); h = h === 0 ? 12 : h; }
+      } else {
+        setPeriod(pm ? "PM" : "AM");
+      }
+      setHour(String(h));
+      setMinute(String(m).padStart(2, '0'));
+    }
+  }, []);
+
+  const emitChange = (h, m, p) => {
+    let hour24 = parseInt(h);
+    if (p === "AM" && hour24 === 12) hour24 = 0;
+    if (p === "PM" && hour24 !== 12) hour24 += 12;
+    onChange(`${String(hour24).padStart(2, '0')}:${m}`);
+  };
+
+  const handleHour = (val) => { setHour(val); emitChange(val, minute, period); };
+  const handleMinute = (val) => { setMinute(val); emitChange(hour, val, period); };
+  const handlePeriod = (val) => { setPeriod(val); emitChange(hour, minute, val); };
+
+  return (
+    <div>
+      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      <div className="flex gap-1 items-center">
+        <select
+          value={hour}
+          onChange={(e) => handleHour(e.target.value)}
+          className="h-10 px-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="time-picker-hour"
+        >
+          {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+            <option key={h} value={String(h)}>{String(h)}</option>
+          ))}
+        </select>
+        <span className="text-gray-500 font-bold">:</span>
+        <select
+          value={minute}
+          onChange={(e) => handleMinute(e.target.value)}
+          className="h-10 px-2 border rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="time-picker-minute"
+        >
+          {["00", "15", "30", "45"].map(m => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+        <select
+          value={period}
+          onChange={(e) => handlePeriod(e.target.value)}
+          className="h-10 px-3 border rounded-md bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+          data-testid="time-picker-period"
+        >
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  );
+};
 
 // Helper function to process text: remove markdown and convert URLs to clickable links
 const renderTextWithLinks = (text) => {
@@ -236,10 +458,9 @@ const ForgotPassword = ({ isOpen, onClose }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
                 </label>
-                <Input
-                  type="email"
+                <EmailInput
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(val) => setEmail(val)}
                   placeholder="Enter your email address"
                   required
                 />
@@ -953,11 +1174,10 @@ const Login = () => {
             )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                type="email"
+              <EmailInput
                 placeholder="Email address"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({...prev, email: e.target.value}))}
+                onChange={(val) => setFormData(prev => ({...prev, email: val}))}
                 required
               />
               <Input
@@ -1054,19 +1274,20 @@ const Register = () => {
               onChange={(e) => setFormData(prev => ({...prev, full_name: e.target.value}))}
               required
             />
-            <Input
-              type="email"
+            <EmailInput
               placeholder="Email address"
               value={formData.email}
-              onChange={(e) => setFormData(prev => ({...prev, email: e.target.value}))}
+              onChange={(val) => setFormData(prev => ({...prev, email: val}))}
               required
             />
-            <Input
-              type="tel"
-              placeholder="Phone number (optional)"
-              value={formData.phone}
-              onChange={(e) => setFormData(prev => ({...prev, phone: e.target.value}))}
-            />
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Phone number (optional)</label>
+              <PhoneInput
+                value={formData.phone}
+                onChange={(val) => setFormData(prev => ({...prev, phone: val}))}
+                placeholder="61 234 567"
+              />
+            </div>
             <Input
               type="password"
               placeholder="Password (min 6 characters)"
@@ -2314,19 +2535,19 @@ const AnalyticsDashboard = () => {
               <div>
                 <div className="flex justify-between mb-2">
                   <span className="text-sm text-gray-600">Successful responses</span>
-                  <span className="text-sm font-medium">94%</span>
+                  <span className="text-sm font-medium">{overview.ai_response_quality || 0}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: '94%' }}></div>
+                  <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${overview.ai_response_quality || 0}%` }}></div>
                 </div>
               </div>
               <div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm text-gray-600">Average response time</span>
-                  <span className="text-sm font-medium">1.2s</span>
+                  <span className="text-sm text-gray-600">Total sessions</span>
+                  <span className="text-sm font-medium">{overview.total_sessions || 0}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '85%' }}></div>
+                  <div className="bg-blue-500 h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (overview.total_sessions || 0) * 10)}%` }}></div>
                 </div>
               </div>
             </div>
@@ -3315,22 +3536,16 @@ const AdminDashboard = ({ adminToken }) => {
                 <div className="space-y-4">
                   <h4 className="text-lg font-semibold text-gray-800 border-b pb-2">Check-in & Check-out</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Check-in Time</label>
-                      <Input
-                        value={formData.check_in_time || formData.check_in || ""}
-                        onChange={(e) => setFormData(prev => ({...prev, check_in_time: e.target.value}))}
-                        placeholder="e.g., 15:00 or 3:00 PM"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Check-out Time</label>
-                      <Input
-                        value={formData.check_out_time || formData.check_out || ""}
-                        onChange={(e) => setFormData(prev => ({...prev, check_out_time: e.target.value}))}
-                        placeholder="e.g., 11:00 or 11:00 AM"
-                      />
-                    </div>
+                    <TimePicker
+                      label="Check-in Time"
+                      value={formData.check_in_time || formData.check_in || ""}
+                      onChange={(val) => setFormData(prev => ({...prev, check_in_time: val}))}
+                    />
+                    <TimePicker
+                      label="Check-out Time"
+                      value={formData.check_out_time || formData.check_out || ""}
+                      onChange={(val) => setFormData(prev => ({...prev, check_out_time: val}))}
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Check-in Instructions</label>
@@ -3444,35 +3659,35 @@ const AdminDashboard = ({ adminToken }) => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">Email</label>
-                      <Input
+                      <EmailInput
                         value={formData.contact?.email || ""}
-                        onChange={(e) => setFormData(prev => ({
+                        onChange={(val) => setFormData(prev => ({
                           ...prev, 
-                          contact: {...(prev.contact || {}), email: e.target.value}
+                          contact: {...(prev.contact || {}), email: val}
                         }))}
                         placeholder="Contact email"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">Phone</label>
-                      <Input
+                      <PhoneInput
                         value={formData.contact?.phone || ""}
-                        onChange={(e) => setFormData(prev => ({
+                        onChange={(val) => setFormData(prev => ({
                           ...prev, 
-                          contact: {...(prev.contact || {}), phone: e.target.value}
+                          contact: {...(prev.contact || {}), phone: val}
                         }))}
-                        placeholder="Contact phone"
+                        placeholder="61 234 567"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-2">WhatsApp</label>
-                      <Input
+                      <PhoneInput
                         value={formData.contact?.whatsapp || ""}
-                        onChange={(e) => setFormData(prev => ({
+                        onChange={(val) => setFormData(prev => ({
                           ...prev, 
-                          contact: {...(prev.contact || {}), whatsapp: e.target.value}
+                          contact: {...(prev.contact || {}), whatsapp: val}
                         }))}
-                        placeholder="WhatsApp number"
+                        placeholder="61 234 567"
                       />
                     </div>
                   </div>
@@ -4072,13 +4287,13 @@ const AdminApartmentEditForm = ({ apartment, onSave, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Contact Phone
           </label>
-          <Input
+          <PhoneInput
             value={formData.contact.phone}
-            onChange={(e) => setFormData(prev => ({
+            onChange={(val) => setFormData(prev => ({
               ...prev,
-              contact: { ...prev.contact, phone: e.target.value }
+              contact: { ...prev.contact, phone: val }
             }))}
-            placeholder="+1234567890"
+            placeholder="61 234 567"
           />
         </div>
 
@@ -4086,12 +4301,11 @@ const AdminApartmentEditForm = ({ apartment, onSave, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Contact Email
           </label>
-          <Input
-            type="email"
+          <EmailInput
             value={formData.contact.email}
-            onChange={(e) => setFormData(prev => ({
+            onChange={(val) => setFormData(prev => ({
               ...prev,
-              contact: { ...prev.contact, email: e.target.value }
+              contact: { ...prev.contact, email: val }
             }))}
             placeholder="host@example.com"
           />
@@ -4101,13 +4315,13 @@ const AdminApartmentEditForm = ({ apartment, onSave, onCancel }) => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             WhatsApp
           </label>
-          <Input
+          <PhoneInput
             value={formData.contact.whatsapp}
-            onChange={(e) => setFormData(prev => ({
+            onChange={(val) => setFormData(prev => ({
               ...prev,
-              contact: { ...prev.contact, whatsapp: e.target.value }
+              contact: { ...prev.contact, whatsapp: val }
             }))}
-            placeholder="+1234567890"
+            placeholder="61 234 567"
           />
         </div>
       </div>
@@ -4426,6 +4640,7 @@ const HostDashboard = () => {
   const [showQRCode, setShowQRCode] = useState(null);
   const [activeTab, setActiveTab] = useState("apartments");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [billingStats, setBillingStats] = useState({ totalChats: 0, totalSessions: 0, totalViews: 0 });
   const [whitelabelData, setWhitelabelData] = useState({
     brand_name: user?.brand_name || "MyHostIQ",
     brand_logo_url: user?.brand_logo_url || "",
@@ -4525,6 +4740,26 @@ const HostDashboard = () => {
       console.error("Error fetching apartments:", error);
     }
   };
+
+  // Fetch billing stats from analytics
+  useEffect(() => {
+    const fetchBillingStats = async () => {
+      try {
+        const response = await axios.get(`${API}/analytics/dashboard`);
+        if (response.data?.overview) {
+          const o = response.data.overview;
+          setBillingStats({
+            totalChats: o.total_chats || 0,
+            totalSessions: o.total_sessions || 0,
+            totalViews: o.total_guest_views || 0
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching billing stats:", error);
+      }
+    };
+    fetchBillingStats();
+  }, [apartments.length]);
 
   const handleImportedData = (importedData) => {
     setFormData(prev => ({
@@ -5483,46 +5718,72 @@ const HostDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   
-                  {/* Current Plan Status */}
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6 mb-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-green-800">Free Trial Active</h3>
-                        <p className="text-green-600">7 days remaining • Expires December 1, 2024</p>
-                        <div className="flex items-center mt-2">
-                          <div className="w-32 bg-green-200 rounded-full h-2 mr-3">
-                            <div className="bg-green-600 h-2 rounded-full" style={{width: '60%'}}></div>
+                  {/* Current Plan Status - Real Data */}
+                  {(() => {
+                    const createdAt = user?.created_at ? new Date(user.created_at) : new Date();
+                    const now = new Date();
+                    const trialEnd = new Date(createdAt);
+                    trialEnd.setDate(trialEnd.getDate() + 7);
+                    const msLeft = trialEnd.getTime() - now.getTime();
+                    const daysLeft = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+                    const daysUsed = 7 - daysLeft;
+                    const trialActive = daysLeft > 0;
+                    const progressPct = Math.min(100, (daysUsed / 7) * 100);
+                    const trialEndStr = trialEnd.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+                    return (
+                      <div className={`border rounded-lg p-6 mb-6 ${trialActive 
+                        ? 'bg-gradient-to-r from-green-50 to-blue-50 border-green-200' 
+                        : 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200'}`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className={`text-lg font-semibold ${trialActive ? 'text-green-800' : 'text-red-800'}`}>
+                              {trialActive ? 'Free Trial Active' : 'Free Trial Expired'}
+                            </h3>
+                            <p className={trialActive ? 'text-green-600' : 'text-red-600'}>
+                              {trialActive 
+                                ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining` 
+                                : 'Trial ended'} 
+                              {' '}• {trialActive ? 'Expires' : 'Expired'} {trialEndStr}
+                            </p>
+                            <div className="flex items-center mt-2">
+                              <div className={`w-32 rounded-full h-2 mr-3 ${trialActive ? 'bg-green-200' : 'bg-red-200'}`}>
+                                <div className={`h-2 rounded-full ${trialActive ? 'bg-green-600' : 'bg-red-600'}`} style={{width: `${progressPct}%`}}></div>
+                              </div>
+                              <span className={`text-sm ${trialActive ? 'text-green-700' : 'text-red-700'}`}>
+                                {daysUsed} of 7 days used
+                              </span>
+                            </div>
                           </div>
-                          <span className="text-sm text-green-700">4 of 7 days used</span>
+                          <div className="text-right">
+                            <div className={`text-2xl font-bold ${trialActive ? 'text-green-800' : 'text-red-800'}`}>$0</div>
+                            <div className={`text-sm ${trialActive ? 'text-green-600' : 'text-red-600'}`}>Current month</div>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-green-800">$0</div>
-                        <div className="text-sm text-green-600">Current month</div>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
-                  {/* Usage Stats */}
+                  {/* Usage Stats - Real Data */}
                   <div className="grid md:grid-cols-3 gap-4 mb-6">
                     <Card className="bg-blue-50 border-blue-200">
                       <CardContent className="p-4 text-center">
                         <div className="text-2xl font-bold text-blue-600">{apartments.length}</div>
                         <div className="text-sm text-blue-600">Properties</div>
-                        <div className="text-xs text-gray-500 mt-1">of 1 allowed</div>
+                        <div className="text-xs text-gray-500 mt-1">of 1 allowed (trial)</div>
                       </CardContent>
                     </Card>
                     <Card className="bg-purple-50 border-purple-200">
                       <CardContent className="p-4 text-center">
-                        <div className="text-2xl font-bold text-purple-600">43</div>
+                        <div className="text-2xl font-bold text-purple-600">{billingStats.totalChats}</div>
                         <div className="text-sm text-purple-600">AI Chats</div>
-                        <div className="text-xs text-gray-500 mt-1">of 100 allowed</div>
+                        <div className="text-xs text-gray-500 mt-1">of 100 allowed (trial)</div>
                       </CardContent>
                     </Card>
                     <Card className="bg-orange-50 border-orange-200">
                       <CardContent className="p-4 text-center">
-                        <div className="text-2xl font-bold text-orange-600">2.4K</div>
-                        <div className="text-sm text-orange-600">Guest Views</div>
+                        <div className="text-2xl font-bold text-orange-600">{billingStats.totalViews || billingStats.totalSessions}</div>
+                        <div className="text-sm text-orange-600">Guest Sessions</div>
                         <div className="text-xs text-gray-500 mt-1">this month</div>
                       </CardContent>
                     </Card>
@@ -5829,36 +6090,35 @@ const HostDashboard = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <Input
+                        <EmailInput
                           placeholder="host@example.com"
-                          type="email"
                           value={formData.contact.email}
-                          onChange={(e) => setFormData(prev => ({
+                          onChange={(val) => setFormData(prev => ({
                             ...prev, 
-                            contact: {...prev.contact, email: e.target.value}
+                            contact: {...prev.contact, email: val}
                           }))}
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                        <Input
-                          placeholder="+1 555 123 4567"
+                        <PhoneInput
                           value={formData.contact.phone}
-                          onChange={(e) => setFormData(prev => ({
+                          onChange={(val) => setFormData(prev => ({
                             ...prev, 
-                            contact: {...prev.contact, phone: e.target.value}
+                            contact: {...prev.contact, phone: val}
                           }))}
+                          placeholder="61 234 567"
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp (for notifications)</label>
-                        <Input
-                          placeholder="+1 555 123 4567"
+                        <PhoneInput
                           value={formData.contact.whatsapp}
-                          onChange={(e) => setFormData(prev => ({
+                          onChange={(val) => setFormData(prev => ({
                             ...prev, 
-                            contact: {...prev.contact, whatsapp: e.target.value}
+                            contact: {...prev.contact, whatsapp: val}
                           }))}
+                          placeholder="61 234 567"
                         />
                       </div>
                     </div>
@@ -5871,22 +6131,16 @@ const HostDashboard = () => {
                       Check-in & Check-out Information
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Check-in Time</label>
-                        <Input
-                          placeholder="e.g., 3:00 PM"
-                          value={formData.check_in_time}
-                          onChange={(e) => setFormData(prev => ({...prev, check_in_time: e.target.value}))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Check-out Time</label>
-                        <Input
-                          placeholder="e.g., 11:00 AM"
-                          value={formData.check_out_time}
-                          onChange={(e) => setFormData(prev => ({...prev, check_out_time: e.target.value}))}
-                        />
-                      </div>
+                      <TimePicker
+                        label="Check-in Time"
+                        value={formData.check_in_time}
+                        onChange={(val) => setFormData(prev => ({...prev, check_in_time: val}))}
+                      />
+                      <TimePicker
+                        label="Check-out Time"
+                        value={formData.check_out_time}
+                        onChange={(val) => setFormData(prev => ({...prev, check_out_time: val}))}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Check-in Instructions</label>
