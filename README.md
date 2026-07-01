@@ -85,9 +85,6 @@ source venv/bin/activate        # macOS/Linux
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Install Emergent Integrations (required for AI features)
-pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
 ```
 
 ### 3. Configure backend environment variables
@@ -101,7 +98,7 @@ JWT_SECRET=change-this-to-a-strong-random-string
 ENCRYPTION_KEY=change-this-32-character-string!!
 FRONTEND_URL=http://localhost:3000
 CORS_ORIGINS=*
-EMERGENT_LLM_KEY=your-emergent-universal-key
+OPENAI_API_KEY=your-openai-api-key
 MAPBOX_API_KEY=your-mapbox-api-key
 SENDGRID_API_KEY=your-sendgrid-api-key
 ```
@@ -110,7 +107,7 @@ SENDGRID_API_KEY=your-sendgrid-api-key
 >
 > | Key                  | Where to get it                                                                                     |
 > | -------------------- | --------------------------------------------------------------------------------------------------- |
-> | `EMERGENT_LLM_KEY`   | [Emergent Platform](https://emergentagent.com) → Profile icon (top-right) → Universal Key → Copy   |
+> | `OPENAI_API_KEY`     | [OpenAI Platform](https://platform.openai.com/api-keys) → Create new secret key                     |
 > | `MAPBOX_API_KEY`     | [Mapbox](https://account.mapbox.com/access-tokens/) → Create a free account → Copy default token    |
 > | `SENDGRID_API_KEY`   | [SendGrid](https://app.sendgrid.com/settings/api_keys) → Create a free account → Create API Key    |
 >
@@ -236,9 +233,8 @@ Navigate to `/admin` and log in with admin credentials to manage all users and a
 ### "I'm having trouble connecting" in chat
 This means the frontend can't reach the backend AI service. Check:
 1. **Backend is running** on port 8001 — check the terminal for errors
-2. **`EMERGENT_LLM_KEY`** is set correctly in `backend/.env`
-3. **`emergentintegrations`** is installed — run: `pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/`
-4. **`REACT_APP_BACKEND_URL`** in `frontend/.env` points to `http://localhost:8001`
+2. **`OPENAI_API_KEY`** is set correctly in `backend/.env`
+3. **`REACT_APP_BACKEND_URL`** in `frontend/.env` points to `http://localhost:8001`
 
 ### MongoDB connection errors
 - **Local MongoDB**: Make sure `mongod` is running (`brew services start mongodb-community` on macOS)

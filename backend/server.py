@@ -24,7 +24,23 @@ import asyncio
 import httpx
 import re
 from datetime import datetime, timezone, timedelta, date
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from openai import AsyncOpenAI
+
+def get_openai_client():
+    """Create OpenAI client. Works with both direct OpenAI keys and Emergent keys."""
+    api_key = os.environ.get('OPENAI_API_KEY') or os.environ.get('EMERGENT_LLM_KEY')
+    if not api_key:
+        raise ValueError("No AI API key configured. Set OPENAI_API_KEY in .env")
+    
+    if api_key.startswith('sk-emergent'):
+        # Emergent Universal Key — route through Emergent proxy
+        return AsyncOpenAI(
+            api_key=api_key,
+            base_url="https://integrations.emergentagent.com/llm"
+        )
+    else:
+        # Direct OpenAI key
+        return AsyncOpenAI(api_key=api_key)
 from urllib.parse import urlparse
 import smtplib
 from email.mime.text import MIMEText
@@ -2826,17 +2842,26 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
                 system_prompt += conversation_context
                 
             # Initialize AI chat
-            api_key = os.environ.get('EMERGENT_LLM_KEY')
+            client = get_openai_client()
             
-            chat = LlmChat(
-                api_key=api_key,
-                session_id=session_id,
-                system_message=system_prompt
-            ).with_model("openai", "gpt-4o-mini")
+            # Build messages for OpenAI
+            ai_messages = [{"role": "system", "content": system_prompt}]
+            # Add conversation history
+            for msg in recent_messages:
+                if msg.get('type') == 'user':
+                    ai_messages.append({"role": "user", "content": msg.get('content', '')})
+                elif msg.get('type') == 'assistant':
+                    ai_messages.append({"role": "assistant", "content": msg.get('content', '')})
+            ai_messages.append({"role": "user", "content": chat_request.message})
             
             # Send message and get response
-            user_message = UserMessage(text=chat_request.message)
-            response = await chat.send_message(user_message)
+            ai_response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=ai_messages,
+                temperature=0.7,
+                max_tokens=1000
+            )
+            response = ai_response.choices[0].message.content
         
         # Save user message to database
         user_chat_message = ChatMessage(
@@ -3005,17 +3030,20 @@ Use this information to enhance your local recommendations.
             # Add conversation context to system prompt
             system_prompt += conversation_context
         # Initialize AI chat
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        client = get_openai_client()
         
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=session_id,
-            system_message=system_prompt
-        ).with_model("openai", "gpt-4o-mini")
+        # Build messages for OpenAI
+        ai_messages = [{"role": "system", "content": system_prompt}]
+        ai_messages.append({"role": "user", "content": chat_request.message})
         
         # Send message to AI
-        user_message = UserMessage(text=chat_request.message)
-        response = await chat.send_message(user_message)
+        ai_response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=ai_messages,
+            temperature=0.7,
+            max_tokens=1000
+        )
+        response = ai_response.choices[0].message.content
         
         # Save user message to database
         user_chat_message = ChatMessage(
@@ -3364,19 +3392,21 @@ async def get_normalized_questions(request: Request, apartment_id: str, current_
         """
         
         # Initialize LLM chat for question analysis
-        api_key = os.getenv('EMERGENT_LLM_KEY')
+        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('EMERGENT_LLM_KEY')
         if not api_key:
             raise HTTPException(status_code=500, detail="AI service not configured")
         
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"normalize_{apartment_id}_{datetime.now().strftime('%Y%m%d')}",
-            system_message=system_message
-        ).with_model("openai", "gpt-4o-mini")
-        
-        # Send message and get normalized questions
-        user_message = UserMessage(text=user_prompt)
-        ai_response = await chat.send_message(user_message)
+        client = get_openai_client()
+        ai_response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        ai_response = ai_response.choices[0].message.content
         
         # Parse AI response
         try:
@@ -3537,19 +3567,21 @@ async def get_ai_insights(request: Request, apartment_id: str, current_user: Use
         """
         
         # Initialize LLM chat
-        api_key = os.getenv('EMERGENT_LLM_KEY')
+        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('EMERGENT_LLM_KEY')
         if not api_key:
             raise HTTPException(status_code=500, detail="AI service not configured")
         
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"insights_{apartment_id}_{datetime.now().strftime('%Y%m%d')}",
-            system_message=system_message
-        ).with_model("openai", "gpt-4o-mini")
-        
-        # Send message and get AI insights
-        user_message = UserMessage(text=user_prompt)
-        ai_response = await chat.send_message(user_message)
+        client = get_openai_client()
+        ai_completion = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+        ai_response = ai_completion.choices[0].message.content
         
         # Parse AI response
         try:
