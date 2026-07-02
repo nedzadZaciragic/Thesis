@@ -23,7 +23,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        env:
+          NPM_CONFIG_LEGACY_PEER_DEPS: true
+        run: npm ci --legacy-peer-deps
 
       - name: Build
         working-directory: frontend

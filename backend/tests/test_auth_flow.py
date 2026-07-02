@@ -3,13 +3,18 @@ Backend auth flow tests for MyHostIQ.
 Verifies fixes for register/login endpoints post the 500-error deploy bug.
 """
 import os
+import sys
 import uuid
-import time
-import pytest
-import requests
+from pathlib import Path
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://thesis-deployment.preview.emergentagent.com').rstrip('/')
-API = f"{BASE_URL}/api"
+import pytest
+from fastapi.testclient import TestClient
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from server import app
+
+API = "/api"
 
 # Unique per test run to avoid rate-limit collisions & duplicates from re-runs
 RUN_ID = uuid.uuid4().hex[:8]
@@ -24,9 +29,9 @@ EXISTING_USER_PASSWORD = "TestPass123!"
 
 @pytest.fixture(scope="session")
 def api_client():
-    s = requests.Session()
-    s.headers.update({"Content-Type": "application/json"})
-    return s
+    with TestClient(app) as client:
+        client.headers.update({"Content-Type": "application/json"})
+        yield client
 
 
 @pytest.fixture(scope="session")

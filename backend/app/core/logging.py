@@ -22,22 +22,32 @@ class AppLogger:
             payload = f"{payload} | {kwargs}"
         self.logger.log(level, payload)
 
-    def debug(self, method_name: str, message: str, **kwargs) -> None:
+    def _resolve_args(self, method_name, message=None):
+        if message is None:
+            return "app", str(method_name)
+        return method_name, message
+
+    def debug(self, method_name: str, message: str = None, **kwargs) -> None:
+        method_name, message = self._resolve_args(method_name, message)
         self._emit(logging.DEBUG, method_name, message, **kwargs)
 
-    def info(self, method_name: str, message: str, **kwargs) -> None:
+    def info(self, method_name: str, message: str = None, **kwargs) -> None:
+        method_name, message = self._resolve_args(method_name, message)
         self._emit(logging.INFO, method_name, message, **kwargs)
 
-    def warning(self, method_name: str, message: str, **kwargs) -> None:
+    def warning(self, method_name: str, message: str = None, **kwargs) -> None:
+        method_name, message = self._resolve_args(method_name, message)
         self._emit(logging.WARNING, method_name, message, **kwargs)
 
-    def error(self, method_name: str, message: str, **kwargs) -> None:
+    def error(self, method_name: str, message: str = None, **kwargs) -> None:
+        method_name, message = self._resolve_args(method_name, message)
         self._emit(logging.ERROR, method_name, message, **kwargs)
 
-    def critical(self, method_name: str, message: str, **kwargs) -> None:
+    def critical(self, method_name: str, message: str = None, **kwargs) -> None:
+        method_name, message = self._resolve_args(method_name, message)
         self._emit(logging.CRITICAL, method_name, message, **kwargs)
 
-    def log(self, method_name: str, message: str, **kwargs) -> None:
+    def log(self, method_name: str, message: str = None, **kwargs) -> None:
         self.info(method_name, message, **kwargs)
 
 

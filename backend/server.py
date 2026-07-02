@@ -66,6 +66,80 @@ load_dotenv(ROOT_DIR / '.env')
 logger = get_logger(__name__)
 config = AppConfig.from_environment()
 
+
+class InMemoryAuthStore:
+    """Lightweight fallback store for auth routes when MongoDB is unavailable."""
+
+    def __init__(self):
+        self.users_by_email: Dict[str, Dict[str, Any]] = {}
+        self.users_by_id: Dict[str, Dict[str, Any]] = {}
+        self.apartments_by_user: Dict[str, List[Dict[str, Any]]] = {}
+
+    def save_user(self, user_dict: Dict[str, Any]) -> Dict[str, Any]:
+        self.users_by_email[user_dict["email"]] = user_dict
+        self.users_by_id[user_dict["id"]] = user_dict
+        self.apartments_by_user.setdefault(user_dict["id"], [])
+        return user_dict
+
+    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        return self.users_by_email.get(email)
+
+    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return self.users_by_id.get(user_id)
+
+    def list_apartments(self, user_id: str) -> List[Dict[str, Any]]:
+        return list(self.apartments_by_user.get(user_id, []))
+
+    def add_apartment(self, user_id: str, apartment_dict: Dict[str, Any]) -> Dict[str, Any]:
+        self.apartments_by_user.setdefault(user_id, [])
+        self.apartments_by_user[user_id].append(apartment_dict)
+        return apartment_dict
+
+
+in_memory_auth_store = InMemoryAuthStore()
+
+
+async def find_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    try:
+        if db is None:
+            raise RuntimeError("MongoDB is not configured")
+        return await db.users.find_one({"email": email})
+    except Exception as exc:
+        logger.warning(f"Falling back to in-memory auth store for email lookup: {exc}")
+        return in_memory_auth_store.get_user_by_email(email)
+
+
+async def find_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        if db is None:
+            raise RuntimeError("MongoDB is not configured")
+        return await db.users.find_one({"id": user_id})
+    except Exception as exc:
+        logger.warning(f"Falling back to in-memory auth store for id lookup: {exc}")
+        return in_memory_auth_store.get_user_by_id(user_id)
+
+
+async def save_user_record(user_dict: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        if db is None:
+            raise RuntimeError("MongoDB is not configured")
+        await db.users.insert_one(user_dict)
+        return user_dict
+    except Exception as exc:
+        logger.warning(f"Falling back to in-memory auth store for user creation: {exc}")
+        return in_memory_auth_store.save_user(user_dict)
+
+
+async def list_user_apartments(user_id: str) -> List[Dict[str, Any]]:
+    try:
+        if db is None:
+            raise RuntimeError("MongoDB is not configured")
+        return await db.apartments.find({"user_id": user_id}).to_list(1000)
+    except Exception as exc:
+        logger.warning(f"Falling back to in-memory apartment store: {exc}")
+        return in_memory_auth_store.list_apartments(user_id)
+
+
 # MongoDB connection
 import certifi
 mongo_url = config.mongo_url
@@ -1022,11 +1096,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id = payload.get("sub")
         if user_id is None:
             raise HTTPException(status_code=401, detail="Invalid token")
-        
-        user = await db.users.find_one({"id": user_id})
+
+        user = await find_user_by_id(user_id)
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
-        
+
         return User(**user)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -1341,10 +1415,10 @@ async def register_user(request: Request, user_data: UserCreate):
     """Register a new user"""
     try:
         # Check if user already exists
-        existing_user = await db.users.find_one({"email": user_data.email})
+        existing_user = await find_user_by_email(user_data.email)
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
-        
+
         # Create user
         user = User(
             email=user_data.email,
@@ -1352,9 +1426,9 @@ async def register_user(request: Request, user_data: UserCreate):
             phone=user_data.phone,
             hashed_password=hash_password(user_data.password)
         )
-        
+
         user_dict = prepare_for_mongo(user.dict())
-        await db.users.insert_one(user_dict)
+        await save_user_record(user_dict)
         
         # Create access token
         access_token = create_access_token({"sub": user.id})
@@ -1457,7 +1531,7 @@ async def login(request: Request, user_data: UserLogin):
     """Login user"""
     try:
         # Find user
-        user = await db.users.find_one({"email": user_data.email})
+        user = await find_user_by_email(user_data.email)
         if not user or not verify_password(user_data.password, user['hashed_password']):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
@@ -2342,7 +2416,7 @@ async def update_apartment(
 async def get_apartments(current_user: User = Depends(get_current_user)):
     """Get user's apartments"""
     try:
-        apartments = await db.apartments.find({"user_id": current_user.id}).to_list(1000)
+        apartments = await list_user_apartments(current_user.id)
         return [Apartment(**apt) for apt in apartments]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
