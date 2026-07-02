@@ -1,0 +1,18 @@
+[build]
+  base = "frontend"
+  command = "yarn build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/api/*"
+  to = ":REACT_APP_BACKEND_URL/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

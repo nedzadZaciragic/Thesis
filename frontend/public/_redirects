@@ -1,0 +1,2 @@
+/api/*  :REACT_APP_BACKEND_URL/api/:splat  200
+/*      /index.html   200
