@@ -1,0 +1,34 @@
+{
+  "summary": "Backend auth-flow regression tests for the deploy 500-error fix. Temporarily swapped MONGO_URL to local MongoDB, ran 11 pytest cases against the public REACT_APP_BACKEND_URL for register/login/me/apartments, then restored the Atlas MONGO_URL. All 11 tests passed. The critical bug (500 on duplicate registration / wrong password) is fixed - endpoints now correctly return 400 and 401.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/register, /api/auth/login (and all endpoints raising HTTPException)", "issue": "Global exception handler rewrites error body from FastAPI's default {'detail': ...} to {'error','message','status_code'}. Not a bug per se, but inconsistent with FastAPI convention and may break clients expecting 'detail'. Documented so main agent is aware."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_auth_flow.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None required for the reported bug - all 8 requested scenarios pass. Optional: consider whether to keep the global exception handler that rewrites 'detail' -> 'message' (frontend clients need to handle this shape)."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 3705 lines - should be split into routers/services modules (auth, apartments, city_pdfs, admin, etc.) for maintainability.",
+    "Every route wraps its body in try/except Exception -> HTTPException(500, str(e)). This leaks internal error messages to clients. Prefer generic 'Internal server error' with logged traceback.",
+    "MONGO_URL and JWT_SECRET are committed in /app/backend/.env in plaintext - rotate the exposed Atlas credentials and SendGrid API key that appear in .env before production.",
+    "Register endpoint returns Token model but user.created_at fallback uses datetime.now() when missing - could hide bugs where created_at is not persisted."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_flow.py (new)",
+    "/app/backend/.env (temporarily switched to local Mongo for testing, then restored to Atlas)"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "not tested (backend-only request)"},
+  "test_credentials": "Registered a fresh unique user per run: test.debug+<runid>@example.com / TestPass123!. Existing local seed user: test.debug@example.com / TestPass123!. Admin: myhomeiq_admin / Admin123!MyHomeIQ (not exercised).",
+  "seed_data_creation": "One user document per test run in local MongoDB `test_database.users` with email test.debug+<runid>@example.com. Not cleaned up (harmless in local DB).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend .env currently points to MongoDB Atlas which is unreachable from the preview environment (SSL/IP restriction). To run tests, switch MONGO_URL to 'mongodb://localhost:27017' in /app/backend/.env, `sudo supervisorctl restart backend`, run tests, then restore. Global exception handler reformats HTTPException body to {'error','message','status_code'} - assert on 'message' not 'detail'. Rate limits: 5/min register, 10/min login - use fresh unique emails per run.",
+  "rca of the issue": "Original 500s on register/login came from: (1) missing dnspython+certifi in requirements.txt causing pymongo to fail SSL to Atlas, and (2) except Exception blocks that caught HTTPException(400/401) and re-raised as HTTPException(500). Both are addressed in the current code: certifi is imported and passed as tlsCAFile for mongodb+srv URLs (server.py L60-66), and register/login now `except HTTPException: raise` before the generic Exception handler (L1620-1624, L1725-1729). Verified by tests: duplicate email -> 400, wrong password -> 401, no 500s observed."
+}

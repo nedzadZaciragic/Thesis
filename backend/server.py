@@ -57,10 +57,15 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
+import certifi
 mongo_url = os.environ.get('MONGO_URL')
 if not mongo_url:
     raise RuntimeError("MONGO_URL environment variable is required")
-client = AsyncIOMotorClient(mongo_url)
+# Use certifi CA bundle for Atlas SSL connections
+if 'mongodb+srv' in mongo_url or 'mongodb.net' in mongo_url:
+    client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
+else:
+    client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'myhostiq')]
 
 # Initialize FastAPI app with security settings
@@ -1612,7 +1617,10 @@ async def register_user(request: Request, user_data: UserCreate):
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1714,9 +1722,10 @@ async def login(request: Request, user_data: UserLogin):
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        if "Invalid credentials" in str(e):
-            raise e
+        logger.error(f"Login error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/auth/forgot-password")
