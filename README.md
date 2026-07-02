@@ -8,7 +8,7 @@ Hosts share a simple link (or QR code) with their guests through Airbnb/Booking.
 
 ## Features
 
-- **AI Chatbot per Apartment** — Each property gets its own context-aware assistant powered by GPT-4o-mini that knows check-in/out details, WiFi credentials, house rules, and item locations
+- **AI Chatbot per Apartment** — Each property gets its own context-aware assistant powered by the OpenAI Agents SDK and GPT-4o-mini that knows check-in/out details, WiFi credentials, house rules, and item locations
 - **Smart Proximity Search** — Guests ask "Where is the nearest pharmacy?" and get real results via Mapbox, with host recommendations prioritized over API results
 - **Multilingual Support** — Automatic language detection (Bosnian, English, German, French, Spanish, Italian) for both proximity queries and general chat
 - **Property Import** — Import apartment details directly from Airbnb or Booking.com URLs
@@ -82,7 +82,7 @@ cd Thesis
 
 ### 2. Backend structure and testing
 
-The backend now uses a class-based service layout under [backend/app](backend/app) so the AI orchestration, prompt building, and chat routes are easier to maintain. The smoke test for the orchestrator lives in [backend/tests](backend/tests).
+The backend now uses a class-based service layout under [backend/app](backend/app) and an OpenAI Agents SDK orchestrator so the AI flow follows the same agent-and-runner pattern as the official examples. The smoke test for the orchestrator lives in [backend/tests](backend/tests).
 
 Run the smoke test with:
 

@@ -1,6 +1,8 @@
 import re
 from typing import Any, Dict, List, Optional
 
+from agents import Agent, ModelSettings, Runner
+
 from app.core.logging import get_logger
 
 
@@ -165,6 +167,21 @@ class StableChatOrchestrator(BaseAIService):
             return self.client_factory()
         raise ValueError("No OpenAI client or client factory configured")
 
+    def _build_agent(self, system_prompt: str) -> Agent:
+        model_settings = ModelSettings(
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            top_p=self.top_p,
+            presence_penalty=self.presence_penalty,
+            frequency_penalty=self.frequency_penalty,
+        )
+        return Agent(
+            name="stay_concierge",
+            instructions=system_prompt,
+            model=self.model,
+            model_settings=model_settings,
+        )
+
     async def respond(
         self,
         apartment: Optional[Dict[str, Any]],
@@ -176,27 +193,19 @@ class StableChatOrchestrator(BaseAIService):
         self.log("respond", "starting chat orchestration")
         language = self.response_formatter.detect_language(message)
         system_prompt = self.prompt_builder.build_system_prompt(apartment, branding)
-        messages = self.message_composer.build_messages(system_prompt, message, history)
+        if history:
+            history_context = "\n".join(
+                f"{item.get('type', 'user')}: {item.get('content') or item.get('message') or item.get('response') or ''}" for item in history[-6:]
+            )
+            system_prompt = f"{system_prompt}\n\nConversation history:\n{history_context}"
 
         try:
-            client = self._get_client()
-            completion = await client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                top_p=self.top_p,
-                presence_penalty=self.presence_penalty,
-                frequency_penalty=self.frequency_penalty,
-                timeout=self.timeout,
-            )
-            content = getattr(completion.choices[0].message, "content", "") or ""
-            if content and isinstance(content, str) and content.strip():
-                response_text = content.strip()
-                used_fallback = False
-            else:
-                response_text = self.response_formatter.build_fallback_response(message, apartment, language)
-                used_fallback = True
+            agent = self._build_agent(system_prompt)
+            result = await Runner.run(starting_agent=agent, input=message)
+            response_text = str(result.final_output_as()) if hasattr(result, "final_output_as") else str(result)
+            if not response_text or not response_text.strip():
+                raise ValueError("empty output")
+            used_fallback = False
         except Exception as exc:
             self.log_error("respond", "model request failed", error=str(exc))
             response_text = self.response_formatter.build_fallback_response(message, apartment, language)
