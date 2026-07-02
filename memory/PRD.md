@@ -6,10 +6,11 @@ AI-powered virtual concierge platform for short-term rental hosts. Hosts create 
 ## Architecture
 - **Frontend**: React 19 + Tailwind CSS + Shadcn/UI (single App.js)
 - **Backend**: FastAPI + Motor (async MongoDB) (single server.py)
-- **Database**: MongoDB (Atlas or local)
-- **AI**: GPT-4o-mini via Emergent Integrations
+- **Database**: MongoDB (Atlas for production, local for dev)
+- **AI**: GPT-4o-mini via OpenAI SDK (Emergent key fallback)
 - **Maps**: Mapbox Geocoding & Search API
 - **Email**: SendGrid
+- **Deployment**: Netlify (Frontend), Render.com (Backend), MongoDB Atlas (DB)
 
 ## What's Been Implemented
 - User auth (register, login, forgot/reset password)
@@ -32,14 +33,23 @@ AI-powered virtual concierge platform for short-term rental hosts. Hosts create 
 - Real-time billing stats (trial days from user created_at, real chat/session counts)
 - AI Response Quality computed from actual success rate
 - Guest sessions and views from real MongoDB data
+- Smart semantic question grouping in analytics
+- Claude-style guest chat UI redesign
 
-## Completed Tasks (This Session)
+## Completed Tasks
 - [2026-06-30] Created comprehensive README.md for GitHub with local setup guide
 - [2026-06-30] Added PhoneInput, EmailInput, TimePicker components across all forms
 - [2026-06-30] Replaced ALL hardcoded analytics/billing values with real MongoDB data
 - [2026-06-30] Free trial now calculates from user.created_at (7-day window, real dates)
 - [2026-06-30] AI Response Quality computed from actual chat success rate
 - [2026-06-30] Billing stats (AI Chats, Guest Sessions) fetched from analytics endpoint
+- [2026-06-30] Replaced emergentintegrations with standard OpenAI SDK
+- [2026-06-30] Cloud deployment config (netlify.toml, .nvmrc, render.yaml)
+- [2026-07-02] Fixed 500 error on registration/login for Render+Atlas deployment
+- [2026-07-02] Added dnspython + certifi to requirements.txt (required for Atlas SSL)
+- [2026-07-02] Added tlsCAFile=certifi.where() for MongoDB Atlas connections
+- [2026-07-02] Fixed exception handling in auth endpoints (HTTPException re-raise)
+- [2026-07-02] Restored truncated server.py from git history (1886→3704 lines)
 
 ## Backlog
 - P1: Refactor backend server.py into modular routes/models/services
