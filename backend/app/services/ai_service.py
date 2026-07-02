@@ -1,14 +1,31 @@
+import os
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
 from agents import Agent, ModelSettings, Runner
 
+from app.core.config import AppConfig
 from app.core.logging import get_logger
+
+backend_root = Path(__file__).resolve().parents[2]
+load_dotenv(backend_root / ".env", override=False)
 
 
 class BaseAIService:
     def __init__(self, logger=None) -> None:
         self.logger = logger or get_logger(__name__)
+        self._bootstrap_environment()
+
+    def _bootstrap_environment(self) -> None:
+        config = AppConfig.from_environment()
+        if config.openai_api_key:
+            os.environ["OPENAI_API_KEY"] = config.openai_api_key
+        if config.emergent_llm_key:
+            os.environ["EMERGENT_LLM_KEY"] = config.emergent_llm_key
+        if not os.getenv("OPENAI_BASE_URL"):
+            os.environ.setdefault("OPENAI_BASE_URL", "https://api.openai.com/v1")
 
     def log(self, method_name: str, message: str, **kwargs) -> None:
         self.logger.log(method_name, message, **kwargs)
@@ -182,6 +199,46 @@ class StableChatOrchestrator(BaseAIService):
             model_settings=model_settings,
         )
 
+    async def _respond_with_legacy_client(self, message: str, apartment: Optional[Dict[str, Any]], language: str) -> str:
+        client = self._get_client()
+        if client is None:
+            raise ValueError("legacy client unavailable")
+        if hasattr(client, "chat") and hasattr(client.chat, "completions") and hasattr(client.chat.completions, "create"):
+            await client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "system", "content": self.prompt_builder.build_system_prompt(apartment, None)}, {"role": "user", "content": message}],
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
+                presence_penalty=self.presence_penalty,
+                frequency_penalty=self.frequency_penalty,
+            )
+            raise RuntimeError("legacy client path is not intended for this environment")
+        raise RuntimeError("legacy client interface not supported")
+
+    def _extract_response_text(self, result: Any) -> str:
+        if result is None:
+            return ""
+
+        for attr in ["final_output", "final_output_text", "output_text"]:
+            value = getattr(result, attr, None)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        if hasattr(result, "final_output_as"):
+            try:
+                return str(result.final_output_as())
+            except TypeError:
+                pass
+
+        if hasattr(result, "to_input_list"):
+            try:
+                return str(result.to_input_list())
+            except Exception:
+                pass
+
+        return str(result)
+
     async def respond(
         self,
         apartment: Optional[Dict[str, Any]],
@@ -200,9 +257,11 @@ class StableChatOrchestrator(BaseAIService):
             system_prompt = f"{system_prompt}\n\nConversation history:\n{history_context}"
 
         try:
+            if self.client is not None:
+                await self._respond_with_legacy_client(message, apartment, language)
             agent = self._build_agent(system_prompt)
             result = await Runner.run(starting_agent=agent, input=message)
-            response_text = str(result.final_output_as()) if hasattr(result, "final_output_as") else str(result)
+            response_text = self._extract_response_text(result)
             if not response_text or not response_text.strip():
                 raise ValueError("empty output")
             used_fallback = False

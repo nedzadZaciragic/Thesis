@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from pydantic import BaseModel, EmailStr, Field
 import os
 import logging
 import traceback
@@ -25,9 +26,11 @@ from datetime import datetime, timezone, timedelta, date
 from openai import AsyncOpenAI
 
 from app.api.chat_routes import ChatRouteService
+from app.core.config import AppConfig
 from app.core.logging import get_logger
 from app.models.chat import ChatMessage, ChatRequest, Token, User, UserCreate
 from app.services.ai_service import StableChatOrchestrator
+from app.services.predicates import ChatPredicates
 
 
 def get_openai_client():
@@ -60,18 +63,22 @@ from io import BytesIO
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+logger = get_logger(__name__)
+config = AppConfig.from_environment()
 
 # MongoDB connection
 import certifi
-mongo_url = os.environ.get('MONGO_URL')
+mongo_url = config.mongo_url
 if not mongo_url:
-    raise RuntimeError("MONGO_URL environment variable is required")
-# Use certifi CA bundle for Atlas SSL connections
-if 'mongodb+srv' in mongo_url or 'mongodb.net' in mongo_url:
-    client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
+    logger.warning("[startup] MONGO_URL is not configured; the app will start in a degraded mode")
+    client = None
+    db = None
 else:
-    client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'myhostiq')]
+    if 'mongodb+srv' in mongo_url or 'mongodb.net' in mongo_url:
+        client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
+    else:
+        client = AsyncIOMotorClient(mongo_url)
+    db = client[config.db_name]
 
 # Initialize FastAPI app with security settings
 app = FastAPI(
@@ -2680,17 +2687,7 @@ async def chat_with_ai(request: Request, chat_request: ChatRequest):
         # Check if this looks like a local recommendation request without host data
         message_lower = chat_request.message.lower()
         city_from_address = extract_city_from_address(apartment.get('address', ''))
-        
-        # Keywords that suggest local recommendations needed
-        local_keywords = [
-            'nightlife', 'night life', 'bars', 'clubs', 'pubs', 'party', 'drink',
-            'restaurants', 'food', 'eat', 'dining', 'cafes', 'coffee', 
-            'activities', 'things to do', 'attractions', 'visit', 'see',
-            'shopping', 'buy', 'stores', 'markets'
-        ]
-        
-        # Check if message is asking for local recommendations
-        needs_web_search = any(keyword in message_lower for keyword in local_keywords)
+        needs_web_search = ChatPredicates.requires_local_recommendations(chat_request.message, apartment)
         has_city_mention = city_from_address.lower() in message_lower if city_from_address else False
         
         if needs_web_search and has_city_mention and city_from_address:
@@ -3401,7 +3398,7 @@ app.include_router(api_router)
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_origins=config.cors_origins.split(","),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
@@ -3416,10 +3413,13 @@ logger = get_logger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
-    logger.info("Database connection closed")
+    if client is not None:
+        client.close()
+    logger.info("[shutdown] Database connection closed")
 
 @app.on_event("startup")
 async def startup_event():
     """Start MyHostIQ API server"""
-    logger.info("🚀 MyHostIQ API server started successfully")
+    if not config.has_ai_credentials():
+        logger.warning("[startup] No AI credentials configured; the app will use deterministic fallbacks")
+    logger.info("[startup] MyHostIQ API server started successfully")
