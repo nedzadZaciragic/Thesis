@@ -1,6 +1,6 @@
 [build]
   base = "frontend/"
-  command = "yarn install && yarn build"
+  command = "npm ci && npm run build"
   publish = "build"
 
 [build.environment]
