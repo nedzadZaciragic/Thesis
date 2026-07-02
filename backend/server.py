@@ -14,7 +14,6 @@ import os
 import logging
 import traceback
 from pathlib import Path
-from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
 import uuid
 import jwt
@@ -24,6 +23,12 @@ import httpx
 import re
 from datetime import datetime, timezone, timedelta, date
 from openai import AsyncOpenAI
+
+from app.api.chat_routes import ChatRouteService
+from app.core.logging import get_logger
+from app.models.chat import ChatMessage, ChatRequest, Token, User, UserCreate
+from app.services.ai_service import StableChatOrchestrator
+
 
 def get_openai_client():
     """Create OpenAI client. Works with both direct OpenAI keys and Emergent keys."""
@@ -328,30 +333,7 @@ class BookingNotification(BaseModel):
     notification_sent: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    user: dict
-
-class ChatMessage(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    apartment_id: str
-    message: str
-    response: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    session_id: str = ""
-    guest_ip: str = ""
-    content: str = ""  # For conversation history
-    type: str = ""     # 'user' or 'assistant' for conversation history
-
-class ChatRequest(BaseModel):
-    apartment_id: str
-    message: str
-    session_id: str = ""
-
-# Duplicate model definitions removed - using the complete models above with new fields
-
-class AnalyticsData(BaseModel):
+class AnalyticsData:
     apartment_id: str
     apartment_name: str
     total_chats: int
@@ -1334,243 +1316,9 @@ async def cache_places(apartment_id: str, category: str, places: List[Dict[str, 
         logger.error(f"Cache storage error: {str(e)}")
 
 def create_ai_system_prompt(apartment_data: dict, user_branding: dict) -> str:
-    """Create a personalized AI system prompt based on apartment data and branding"""
-    brand_name = user_branding.get('brand_name', 'My Host IQ')
-    apartment_address = apartment_data.get('address', '')
-    
-    # Improved city extraction from address - more robust approach
-    apartment_city = ""
-    if apartment_address:
-        # Split address by comma and process each part
-        address_parts = [part.strip() for part in apartment_address.split(',')]
-        
-        # Common patterns for city extraction
-        for i, part in enumerate(address_parts):            
-            # Skip street addresses (contain numbers followed by letters)
-            if any(c.isdigit() for c in part[:10]):  # Check first 10 chars for numbers
-                continue
-                
-            # Skip postal codes (short sequences with numbers)
-            if len(part) <= 8 and any(c.isdigit() for c in part) and len([c for c in part if c.isdigit()]) >= 2:
-                continue
-                
-            # Skip country names (usually last part and longer)
-            if i == len(address_parts) - 1 and len(address_parts) > 2:
-                continue
-                
-            # Look for city-like patterns (no numbers, reasonable length)
-            if len(part) >= 3 and not any(c.isdigit() for c in part):
-                apartment_city = part
-                break
-        
-        # Fallback: if no city found, use second-to-last part (common pattern)
-        if not apartment_city and len(address_parts) >= 2:
-            potential_city = address_parts[-2].strip()
-            # Make sure it's not a postal code or street
-            if not any(c.isdigit() for c in potential_city):
-                apartment_city = potential_city
-        
-        # Final fallback: manually handle known patterns
-        if not apartment_city:
-            # For addresses like "Street Number, City, Country" - take middle part
-            if len(address_parts) == 3:
-                apartment_city = address_parts[1].strip()
-    
-    # Default to "this area" if no city detected
-    if not apartment_city:
-        apartment_city = "this area"
-    
-    base_prompt = f"""You are a helpful AI concierge from {brand_name}, specifically designed to assist guests with their stay.
-
-🚨 LANGUAGE DETECTION - ABSOLUTE PRIORITY:
-
-STEP 1: ANALYZE THE GUEST'S CURRENT MESSAGE LANGUAGE:
-- English indicators: "when", "how", "what", "where", "is", "the", "can", "you", "help"
-- Spanish indicators: "cuando", "como", "que", "donde", "es", "el", "la", "puede", "ayudar"
-- French indicators: "quand", "comment", "que", "où", "est", "le", "la", "pouvez", "aider"
-- German indicators: "wann", "wie", "was", "wo", "ist", "der", "die", "das", "können", "helfen"
-- Bosnian/Serbian/Croatian indicators: "kada", "kako", "šta", "gdje", "je", "li", "možete", "pomoci"
-
-STEP 2: MATCH THE DETECTED LANGUAGE EXACTLY:
-- If guest message contains English words → respond ONLY in English
-- If guest message contains Spanish words → respond ONLY in Spanish  
-- If guest message contains French words → respond ONLY in French
-- If guest message contains German words → respond ONLY in German
-- If guest message contains Bosnian/Serbian/Croatian words → respond ONLY in that language
-
-STEP 3: NEVER MIX LANGUAGES - your entire response must be in ONE language only
-
-STRICT SCOPE RULES - CRITICALLY IMPORTANT:
-1. ONLY answer questions about:
-   - The apartment/accommodation (check-in, WiFi, amenities, rules, contacts, etc.)
-   - The city: {apartment_city} (local recommendations, restaurants, bars, activities)
-   
-2. If a guest asks about OTHER cities/locations (not {apartment_city}), you MUST detect their language and respond with the appropriate fallback:
-
-   DETECT LANGUAGE AND USE APPROPRIATE FALLBACK:
-   
-   If guest writes in ENGLISH:
-   "I'm specifically designed to help with your stay and recommendations in {apartment_city}. For information about other cities, I'd recommend checking local tourism websites or travel guides. Is there anything about your stay or {apartment_city} I can help you with?"
-   
-   If guest writes in SPANISH:
-   "Estoy específicamente diseñado para ayudar con tu estancia y recomendaciones en {apartment_city}. Para información sobre otras ciudades, recomiendo consultar sitios web de turismo local o guías de viaje. ¿Hay algo sobre tu estancia o {apartment_city} con lo que pueda ayudarte?"
-   
-   If guest writes in FRENCH:
-   "Je suis spécialement conçu pour aider avec votre séjour et les recommandations à {apartment_city}. Pour des informations sur d'autres villes, je recommande de consulter des sites web de tourisme local ou des guides de voyage. Y a-t-il quelque chose concernant votre séjour ou {apartment_city} avec quoi je peux vous aider?"
-   
-   If guest writes in GERMAN:
-   "Ich bin speziell dafür entwickelt, bei Ihrem Aufenthalt und Empfehlungen in {apartment_city} zu helfen. Für Informationen über andere Städte empfehle ich, lokale Tourismus-Websites oder Reiseführer zu konsultieren. Gibt es etwas bezüglich Ihres Aufenthalts oder {apartment_city}, womit ich Ihnen helfen kann?"
-   
-   If guest writes in ITALIAN:
-   "Sono specificamente progettato per aiutare con il tuo soggiorno e raccomandazioni a {apartment_city}. Per informazioni su altre città, raccomando di consultare siti web di turismo locale o guide di viaggio. C'è qualcosa riguardo al tuo soggiorno o {apartment_city} con cui posso aiutarti?"
-
-   If guest writes in BOSNIAN/SERBIAN/CROATIAN:
-   "Posebno sam dizajniran da pomognem sa vašim boravkom i preporukama u {apartment_city}. Za informacije o drugim gradovima, preporučujem da pogledate lokalne turističke web stranice ili vodiče. Ima li nešto o vašem boravku ili {apartment_city} s čim mogu da pomognem?"
-
-3. CONTEXT AWARENESS: Always remember previous questions in this conversation. If someone asks "When is check-in?" and then "How?", understand that "How?" refers to check-in instructions.
-
-4. NEUTRAL REFERENCES: Never mention the specific apartment name. Always use neutral phrases like "your stay", "the apartment", "your accommodation".
-
-5. LOCAL RECOMMENDATIONS WITH WEB SEARCH: If a guest asks about {apartment_city} and the host hasn't provided specific information, you MUST:
-   - First check if the user has uploaded city PDF information about {apartment_city}
-   - If no specific information available, use web search to find current, relevant local recommendations
-   - For nightlife questions, search specifically for bars, clubs, pubs in {apartment_city}
-   - For restaurant questions, search for popular restaurants in {apartment_city}
-   - For activities, search for attractions, things to do in {apartment_city}
-   - Always provide 3-5 specific, real recommendations with brief descriptions
-
-6. WEB SEARCH ENHANCEMENT: When providing local recommendations without host data:
-   - Use current web search results to give accurate, up-to-date information
-   - Include specific names, addresses when possible
-   - Provide variety (different types of venues/activities)
-   - Prioritize highly-rated, popular options
-
-PROPERTY INFORMATION:
-"""
-    
-    # Add apartment specific information WITHOUT using apartment name
-    if apartment_data.get('description'):
-        base_prompt += f"Property Description: {apartment_data['description']}\n"
-    
-    if apartment_address:
-        base_prompt += f"Location: {apartment_address}\n"
-    
-    # Add rules
-    if apartment_data.get('rules'):
-        rules_text = ', '.join(apartment_data['rules'])
-        base_prompt += f"Important Property Rules: {rules_text}\n"
-    
-    # Add contact information
-    if apartment_data.get('contact'):
-        contact = apartment_data['contact']
-        if contact.get('phone') or contact.get('email'):
-            base_prompt += "Host Contact Information: "
-            if contact.get('phone'):
-                base_prompt += f"Phone: {contact['phone']} "
-            if contact.get('email'):
-                base_prompt += f"Email: {contact['email']}"
-            base_prompt += "\n"
-    
-    # Add check-in/check-out information
-    if apartment_data.get('check_in_time') or apartment_data.get('check_out_time') or apartment_data.get('check_in_instructions'):
-        base_prompt += "\nCHECK-IN/CHECK-OUT INFORMATION:\n"
-        if apartment_data.get('check_in_time'):
-            base_prompt += f"Check-in time: {apartment_data['check_in_time']}\n"
-        if apartment_data.get('check_out_time'):
-            base_prompt += f"Check-out time: {apartment_data['check_out_time']}\n"
-        if apartment_data.get('check_in_instructions'):
-            base_prompt += f"Check-in instructions: {apartment_data['check_in_instructions']}\n"
-    
-    # Add WiFi information
-    if apartment_data.get('wifi_network') or apartment_data.get('wifi_password') or apartment_data.get('wifi_instructions'):
-        base_prompt += "\nWIFI INFORMATION:\n"
-        if apartment_data.get('wifi_network'):
-            base_prompt += f"WiFi Network: {apartment_data['wifi_network']}\n"
-        if apartment_data.get('wifi_password'):
-            base_prompt += f"WiFi Password: {apartment_data['wifi_password']}\n"
-        if apartment_data.get('wifi_instructions'):
-            base_prompt += f"WiFi Instructions: {apartment_data['wifi_instructions']}\n"
-    
-    # Add item locations
-    if apartment_data.get('apartment_locations'):
-        locations = apartment_data['apartment_locations']
-        if locations and isinstance(locations, dict):
-            base_prompt += "\nAPARTMENT ITEM LOCATIONS:\n"
-            for item, location in locations.items():
-                if location:  # Only add if location is not empty
-                    base_prompt += f"- {item.replace('_', ' ').title()}: {location}\n"
-    
-    # Add recommendations
-    if apartment_data.get('recommendations'):
-        recommendations = apartment_data['recommendations']
-        base_prompt += f"\nLOCAL RECOMMENDATIONS FOR {apartment_city.upper()}:\n"
-        base_prompt += "IMPORTANT: When mentioning these places, ALWAYS include a Google Maps link using this format:\n"
-        base_prompt += "🔗 [Place Name](https://www.google.com/maps/search/?api=1&query=Place+Name+Address+City)\n\n"
-        
-        if recommendations.get('restaurants'):
-            restaurants = recommendations['restaurants']
-            if restaurants:
-                base_prompt += "Restaurants:\n"
-                for rest in restaurants:
-                    name = rest.get('name', 'Unknown')
-                    location = rest.get('location', '')
-                    rest_type = rest.get('type', 'Restaurant')
-                    tip = rest.get('tip', 'No additional info')
-                    
-                    # Create Google Maps search query
-                    search_query = f"{name} {location} {apartment_city}".replace(' ', '+')
-                    maps_link = f"https://www.google.com/maps/search/?api=1&query={search_query}"
-                    
-                    location_info = f" (📍 {location})" if location else ""
-                    base_prompt += f"- {name} ({rest_type}){location_info}\n"
-                    base_prompt += f"  🔗 Google Maps: {maps_link}\n"
-                    base_prompt += f"  💡 Tip: {tip}\n"
-        
-        if recommendations.get('hidden_gems'):
-            gems = recommendations['hidden_gems']
-            if gems:
-                base_prompt += "\nHidden Gems & Attractions:\n"
-                for gem in gems:
-                    name = gem.get('name', 'Unknown')
-                    location = gem.get('location', '')
-                    tip = gem.get('tip', 'No additional info')
-                    
-                    # Create Google Maps search query
-                    search_query = f"{name} {location} {apartment_city}".replace(' ', '+')
-                    maps_link = f"https://www.google.com/maps/search/?api=1&query={search_query}"
-                    
-                    location_info = f" (📍 {location})" if location else ""
-                    base_prompt += f"- {name}{location_info}\n"
-                    base_prompt += f"  🔗 Google Maps: {maps_link}\n"
-                    base_prompt += f"  💡 Tip: {tip}\n"
-        
-        if recommendations.get('transport'):
-            base_prompt += f"\n🚗 Transportation: {recommendations['transport']}\n"
-    
-    base_prompt += f"""
-FINAL INSTRUCTIONS:
-- ALWAYS respond in the guest's language (English, Spanish, French, German, Italian, Bosnian, etc.)
-- Remember conversation context - if someone asks "When?" after asking about check-in, understand they want check-in details
-- STRICTLY stay within scope: the apartment and {apartment_city} ONLY
-- Use multilingual fallback responses for out-of-scope questions IN THE GUEST'S LANGUAGE
-- NEVER mention the apartment's specific name - use "your stay", "the apartment", "your accommodation"
-- In fallback messages, refer to the city name "{apartment_city}" not postal codes
-- Be helpful, friendly, and professional as a representative of {brand_name}
-- If no specific information is available about {apartment_city}, provide general local recommendations but ONLY for {apartment_city}
-- DO NOT use markdown formatting (no **bold**, no *italic*, no #headers) - use plain text only
-- Use emojis for visual emphasis instead of markdown
-
-📍 GOOGLE MAPS LINKS - MANDATORY:
-When recommending ANY place (restaurant, attraction, hidden gem, etc.):
-1. ALWAYS include a clickable Google Maps link
-2. Format the link as plain URL: https://www.google.com/maps/search/?api=1&query=Place+Name+Address+City
-3. Replace spaces with '+' in the URL
-4. Include the place name, address (if known), and city in the search query
-5. Example: For "Nedzad's House at Titova 58b, Sarajevo" → https://www.google.com/maps/search/?api=1&query=Nedzad's+House+Titova+58b+Sarajevo
-
-This makes it SUPER EASY for guests to find places!"""
-    
-    return base_prompt
+    """Backward-compatible wrapper around the new prompt builder."""
+    from app.services.ai_service import PromptBuilder
+    return PromptBuilder().build_system_prompt(apartment_data, user_branding)
 
 class PasswordResetRequest(BaseModel):
     email: EmailStr
@@ -2836,42 +2584,18 @@ async def guest_chat_with_ai(request: Request, chat_request: ChatRequest):
             # Reverse to get chronological order
             recent_messages.reverse()
             
-            # Build conversation context
-            conversation_context = ""
-            if recent_messages:
-                conversation_context = "\n\n🧠 CONVERSATION CONTEXT TRACKING:\n"
-                conversation_context += "Recent conversation history:\n\n"
-                
-                for i, msg in enumerate(recent_messages):
-                    role = "Guest" if msg.get('type') == 'user' else "AI Assistant"
-                    conversation_context += f"{role}: {msg.get('content', '')}\n"
-                
-                conversation_context += f"\nCurrent Guest Question: {chat_request.message}\n"
-                conversation_context += "\nAlways maintain conversation flow and context awareness.\n\n"
-                
-                system_prompt += conversation_context
-                
-            # Initialize AI chat
-            client = get_openai_client()
-            
-            # Build messages for OpenAI
-            ai_messages = [{"role": "system", "content": system_prompt}]
-            # Add conversation history
-            for msg in recent_messages:
-                if msg.get('type') == 'user':
-                    ai_messages.append({"role": "user", "content": msg.get('content', '')})
-                elif msg.get('type') == 'assistant':
-                    ai_messages.append({"role": "assistant", "content": msg.get('content', '')})
-            ai_messages.append({"role": "user", "content": chat_request.message})
-            
-            # Send message and get response
-            ai_response = await client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=ai_messages,
-                temperature=0.7,
-                max_tokens=1000
+            orchestrator = StableChatOrchestrator(
+                client_factory=get_openai_client,
+                model="gpt-4o-mini"
             )
-            response = ai_response.choices[0].message.content
+            orchestrator_result = await orchestrator.respond(
+                apartment=apartment,
+                branding=branding,
+                message=chat_request.message,
+                session_id=session_id,
+                history=recent_messages,
+            )
+            response = orchestrator_result["response"]
         
         # Save user message to database
         user_chat_message = ChatMessage(
@@ -3039,21 +2763,18 @@ Use this information to enhance your local recommendations.
             
             # Add conversation context to system prompt
             system_prompt += conversation_context
-        # Initialize AI chat
-        client = get_openai_client()
-        
-        # Build messages for OpenAI
-        ai_messages = [{"role": "system", "content": system_prompt}]
-        ai_messages.append({"role": "user", "content": chat_request.message})
-        
-        # Send message to AI
-        ai_response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=ai_messages,
-            temperature=0.7,
-            max_tokens=1000
+        orchestrator = StableChatOrchestrator(
+            client_factory=get_openai_client,
+            model="gpt-4o-mini"
         )
-        response = ai_response.choices[0].message.content
+        orchestrator_result = await orchestrator.respond(
+            apartment=apartment,
+            branding=branding,
+            message=chat_request.message,
+            session_id=session_id,
+            history=recent_messages,
+        )
+        response = orchestrator_result["response"]
         
         # Save user message to database
         user_chat_message = ChatMessage(
@@ -3691,7 +3412,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
