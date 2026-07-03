@@ -8,7 +8,7 @@ Hosts share a simple link (or QR code) with their guests through Airbnb/Booking.
 
 ## Features
 
-- **AI Chatbot per Apartment** — Each property gets its own context-aware assistant powered by GPT-4o-mini that knows check-in/out details, WiFi credentials, house rules, and item locations
+- **AI Chatbot per Apartment** — Each property gets its own context-aware assistant powered by the OpenAI Agents SDK and GPT-4o-mini that knows check-in/out details, WiFi credentials, house rules, and item locations
 - **Smart Proximity Search** — Guests ask "Where is the nearest pharmacy?" and get real results via Mapbox, with host recommendations prioritized over API results
 - **Multilingual Support** — Automatic language detection (Bosnian, English, German, French, Spanish, Italian) for both proximity queries and general chat
 - **Property Import** — Import apartment details directly from Airbnb or Booking.com URLs
@@ -48,17 +48,24 @@ Hosts share a simple link (or QR code) with their guests through Airbnb/Booking.
 ```
 myhost-iq/
 ├── backend/
-│   ├── server.py           # FastAPI application (routes, models, AI logic)
-│   ├── requirements.txt    # Python dependencies
-│   └── .env                # Backend environment variables
+│   ├── app/
+│   │   ├── api/
+│   │   ├── core/
+│   │   ├── models/
+│   │   └── services/
+│   ├── tests/
+│   ├── server.py
+│   ├── requirements.txt
+│   └── .env
 ├── frontend/
 │   ├── src/
-│   │   ├── App.js          # Main React application
-│   │   ├── components/ui/  # Shadcn UI components
-│   │   └── index.js        # Entry point
+│   │   ├── App.js
+│   │   ├── components/ui/
+│   │   └── index.js
 │   ├── package.json
 │   ├── tailwind.config.js
-│   └── .env                # Frontend environment variables
+│   └── .env
+├── scratchspace/
 └── README.md
 ```
 
@@ -67,6 +74,32 @@ myhost-iq/
 ## Getting Started
 
 ### 1. Clone the repository
+
+```bash
+git clone https://github.com/nedzadZaciragic/Thesis.git
+cd Thesis
+```
+
+### 2. Backend structure and testing
+
+The backend now uses a class-based service layout under [backend/app](backend/app) and an OpenAI Agents SDK orchestrator so the AI flow follows the same agent-and-runner pattern as the official examples. The smoke test for the orchestrator lives in [backend/tests](backend/tests).
+
+Run the smoke test with:
+
+```bash
+cd backend
+pytest -q tests/test_ai_orchestrator_smoke.py
+```
+
+### 3. Deploying to Netlify
+
+The frontend deploy workflow is defined in [.github/workflows/netlify-deploy.yml](.github/workflows/netlify-deploy.yml). The workflow expects the following repository secrets to be configured:
+
+- NETLIFY_AUTH_TOKEN
+- NETLIFY_SITE_ID
+- REACT_APP_BACKEND_URL
+
+The backend can be deployed separately through Render using [render.yaml](render.yaml).
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/myhost-iq.git
